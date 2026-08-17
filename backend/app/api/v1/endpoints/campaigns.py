@@ -361,7 +361,11 @@ async def get_campaign_detail(
     """
     Retrieves real-time status and statistics for a broadcast campaign.
     """
-    stmt = select(Campaign).where(Campaign.id == campaign_id)
+    stmt = (
+        select(Campaign)
+        .join(Event, Campaign.event_id == Event.id)
+        .where(Campaign.id == campaign_id, Event.user_id == current_user.id)
+    )
     res = await db.execute(stmt)
     campaign = res.scalars().first()
     if not campaign:
@@ -437,6 +441,16 @@ async def get_campaign_recipients(
     """
     Returns guest-level delivery status and error details for a broadcast campaign.
     """
+    # Verify campaign ownership
+    c_stmt = (
+        select(Campaign)
+        .join(Event, Campaign.event_id == Event.id)
+        .where(Campaign.id == campaign_id, Event.user_id == current_user.id)
+    )
+    c_res = await db.execute(c_stmt)
+    if not c_res.scalars().first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
     stmt = (
         select(BroadcastMessage, Guest.name.label("guest_name"), Guest.relationship.label("guest_rel"))
         .join(Guest, BroadcastMessage.guest_id == Guest.id)
@@ -502,6 +516,15 @@ async def retry_failed_campaign_messages(
     """
     Retries all failed or rejected recipients for a campaign.
     """
+    c_stmt = (
+        select(Campaign)
+        .join(Event, Campaign.event_id == Event.id)
+        .where(Campaign.id == campaign_id, Event.user_id == current_user.id)
+    )
+    c_res = await db.execute(c_stmt)
+    if not c_res.scalars().first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
     count = await CampaignService.retry_failed_recipients(db, campaign_id)
     return ResponseModel(
         data={"requeued_count": count},
@@ -518,6 +541,15 @@ async def cancel_campaign(
     """
     Cancels any remaining queued or retrying dispatches for a campaign.
     """
+    c_stmt = (
+        select(Campaign)
+        .join(Event, Campaign.event_id == Event.id)
+        .where(Campaign.id == campaign_id, Event.user_id == current_user.id)
+    )
+    c_res = await db.execute(c_stmt)
+    if not c_res.scalars().first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
     success = await CampaignService.cancel_campaign(db, campaign_id)
     if not success:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -537,7 +569,11 @@ async def resend_single_message(
     """
     Re-sends an individual message to a specific guest.
     """
-    stmt = select(BroadcastMessage).where(BroadcastMessage.id == message_id)
+    stmt = (
+        select(BroadcastMessage)
+        .join(Event, BroadcastMessage.event_id == Event.id)
+        .where(BroadcastMessage.id == message_id, Event.user_id == current_user.id)
+    )
     res = await db.execute(stmt)
     msg = res.scalars().first()
     if not msg:

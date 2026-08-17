@@ -63,6 +63,7 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
 
   // Preview
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewGuestId, setPreviewGuestId] = useState<string>('');
   const [previewText, setPreviewText] = useState('');
   const [previewHtml, setPreviewHtml] = useState('');
 
@@ -89,12 +90,14 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
             .map((g: any) => g.id)
             .filter((id: any) => typeof id === 'string' && id && id !== 'undefined');
           setSelectedGuestIds(new Set(validIds));
+          if (validIds.length > 0) setPreviewGuestId(validIds[0]);
         } else if (guests && guests.length > 0) {
           setEffectiveGuests(guests);
           const validIds = guests
             .map((g: any) => g.id)
             .filter((id: any) => typeof id === 'string' && id && id !== 'undefined');
           setSelectedGuestIds(new Set(validIds));
+          if (validIds.length > 0) setPreviewGuestId(validIds[0]);
         }
       })
       .catch(() => {
@@ -104,6 +107,7 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
             .map((g: any) => g.id)
             .filter((id: any) => typeof id === 'string' && id && id !== 'undefined');
           setSelectedGuestIds(new Set(validIds));
+          if (validIds.length > 0) setPreviewGuestId(validIds[0]);
         }
       });
 
@@ -120,16 +124,17 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
       .catch(() => {});
   }, [isOpen, eventId, eventTitle, guests]);
 
-  // Fetch preview when switching channel tab or template changes in Step 3
+  // Fetch preview when switching channel tab, template changes, or preview guest changes in Step 3
   useEffect(() => {
     if (!isOpen || step !== 3) return;
     setPreviewLoading(true);
 
-    const sampleGuestId = Array.from(selectedGuestIds)[0] || (effectiveGuests[0]?.id);
+    const selectedList = Array.from(selectedGuestIds);
+    const targetGuestId = previewGuestId || selectedList[0] || (effectiveGuests[0]?.id);
     const bodyPayload: any = {
       event_id: eventId,
       channel: channelTab,
-      guest_id: sampleGuestId,
+      guest_id: targetGuestId,
     };
 
     if (channelTab === 'WHATSAPP') bodyPayload.custom_template = customWhatsApp;
@@ -151,7 +156,7 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
       })
       .catch(() => {})
       .finally(() => setPreviewLoading(false));
-  }, [isOpen, step, channelTab, customWhatsApp, customSMS, customEmailSubject, customEmailBody, eventId, effectiveGuests, selectedGuestIds]);
+  }, [isOpen, step, channelTab, customWhatsApp, customSMS, customEmailSubject, customEmailBody, eventId, effectiveGuests, selectedGuestIds, previewGuestId]);
 
   if (!isOpen) return null;
 
@@ -266,10 +271,10 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
         <div className="border-b border-[#E9D3D0] pb-4 flex items-center justify-between">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-[#F2E5E2] text-[#9E6F6D] text-[10px] font-mono font-bold uppercase border border-[#E9D3D0] mb-1">
-              Multi-Channel Broadcast Engine
+              SEND CELEBRATION INVITATIONS
             </div>
             <h2 className="font-serif text-2xl font-extrabold text-[#302829]">
-              Broadcast Invitation to Guests
+              Send Invitations to Loved Ones
             </h2>
           </div>
           <button
@@ -688,12 +693,34 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
 
                 {/* Right: Live Preview */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-[#51484A] flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-[#9E6F6D]" /> Live Resolved Message Preview
-                  </label>
-                  <div className="p-4 rounded-2xl bg-[#FAF7F5] border border-[#E9D3D0] h-64 overflow-y-auto text-xs whitespace-pre-wrap text-[#302829]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#51484A] flex items-center gap-1.5">
+                      <Eye className="w-4 h-4 text-[#9E6F6D]" /> Live Resolved Message Preview
+                    </label>
+                    {eligibleSelectedGuests.length > 0 && (
+                      <div className="flex items-center gap-1.5 text-xs">
+                        <span className="text-[10px] text-[#7A6B6C]">Preview Guest:</span>
+                        <select
+                          value={previewGuestId}
+                          onChange={(e) => setPreviewGuestId(e.target.value)}
+                          className="py-1 px-2 rounded-lg bg-white border border-[#E9D3D0] text-[11px] font-bold text-[#302829]"
+                        >
+                          {eligibleSelectedGuests.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name} ({g.phone || g.email || 'No contact'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-[#FAF7F5] border border-[#E9D3D0] h-64 overflow-y-auto text-xs whitespace-pre-wrap text-[#302829] shadow-inner font-sans leading-relaxed">
                     {previewLoading ? (
-                      <div className="p-8 text-center text-[#8C7E80]">Generating preview...</div>
+                      <div className="h-full flex items-center justify-center text-[#8C7E80] text-xs">
+                        <RefreshCw className="w-4 h-4 animate-spin mr-2 text-[#9E6F6D]" />
+                        Rendering exact guest preview...
+                      </div>
                     ) : (
                       previewText || 'No preview available'
                     )}
@@ -707,16 +734,16 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
           {step === 4 && (
             <div className="space-y-4">
               <div>
-                <h3 className="font-serif text-lg font-bold text-[#302829]">Review & Launch Campaign</h3>
+                <h3 className="font-serif text-lg font-bold text-[#302829]">Review & Send Invitations</h3>
                 <p className="text-xs text-[#7A6B6C]">
-                  Please verify your campaign settings before initiating delivery.
+                  Please verify your message and recipients before sending.
                 </p>
               </div>
 
-              {/* Campaign Summary Card */}
+              {/* Summary Card */}
               <div className="p-5 rounded-2xl bg-white border border-[#E9D3D0] shadow-sm space-y-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-[#7A6B6C]">Campaign Name</label>
+                  <label className="text-xs font-bold text-[#7A6B6C]">Invitation Batch Name</label>
                   <input
                     type="text"
                     value={campaignTitle}
@@ -741,20 +768,20 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
                 </div>
 
                 <div className="p-3 rounded-xl bg-[#FAF7F5] border border-[#E9D3D0] flex items-center justify-between text-xs font-bold">
-                  <span>Total Estimated Outbound Messages:</span>
+                  <span>Total Estimated Invitations:</span>
                   <span className="text-lg font-serif font-extrabold text-[#9E6F6D]">{totalEstimatedMessages}</span>
                 </div>
               </div>
 
-              {/* Large Campaign Warning */}
+              {/* Large Send Warning */}
               {totalEstimatedMessages > 100 && (
                 <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 space-y-2">
                   <div className="flex items-center gap-2 font-bold text-xs">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span>Large Campaign Confirmation ({totalEstimatedMessages} messages)</span>
+                    <span>Large Guest List Confirmation ({totalEstimatedMessages} invitations)</span>
                   </div>
                   <p className="text-[11px] text-amber-800">
-                    You are about to dispatch invitations to {selectedGuestIds.size} guests across {activeChannelsList.join(', ')}.
+                    You are about to send invitations to {selectedGuestIds.size} guests across {activeChannelsList.join(', ')}.
                   </p>
                   <label className="flex items-center gap-2 text-xs font-bold text-amber-900 cursor-pointer pt-1">
                     <input
@@ -763,7 +790,7 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
                       onChange={(e) => setConfirmedLargeSend(e.target.checked)}
                       className="w-4 h-4 rounded border-amber-400 accent-amber-700"
                     />
-                    <span>I confirm and want to broadcast these invitations now</span>
+                    <span>I confirm and want to send these invitations now</span>
                   </label>
                 </div>
               )}
@@ -816,12 +843,12 @@ export const BroadcastWizardModal: React.FC<BroadcastWizardModalProps> = ({
               {isSubmitting ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                  <span>Enqueuing Campaign...</span>
+                  <span>Sending Invitations...</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4 text-white" />
-                  <span>SEND BROADCAST NOW</span>
+                  <span>SEND INVITATIONS NOW</span>
                 </>
               )}
             </button>

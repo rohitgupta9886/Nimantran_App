@@ -69,7 +69,7 @@ class QRService:
         if not guest:
             raise ValueError("Associated Guest record for this QR pass was not found.")
 
-        if hasattr(guest, "rsvp_status") and guest.rsvp_status == RSVPStatus.DECLINED:
+        if hasattr(guest, "rsvp_status") and (guest.rsvp_status == RSVPStatus.NO or guest.rsvp_status == "DECLINED"):
             raise ValueError(f"Guest '{guest.name}' RSVP status is DECLINED for this event.")
 
         already_checked = guest.checked_in

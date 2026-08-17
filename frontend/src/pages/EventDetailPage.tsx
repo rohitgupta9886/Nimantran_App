@@ -20,6 +20,8 @@ import { EventStoryStudio } from '../components/StoryEngine/EventStoryStudio';
 import { RsvpAnalyticsCard } from '../components/RsvpAnalyticsCard';
 import { QrScannerModal } from '../components/QrScannerModal';
 import { ShareInvitationModal } from '../components/ShareInvitationModal';
+import { CelebrationWorkspaceJourney } from '../components/CelebrationWorkspaceJourney';
+import { EditCelebrationModal } from '../components/EditCelebrationModal';
 import { copyInvitationLink } from '../services/invitationSharingService';
 
 export const EventDetailPage: React.FC = () => {
@@ -31,6 +33,7 @@ export const EventDetailPage: React.FC = () => {
   const [isBulkWhatsAppOpen, setIsBulkWhatsAppOpen] = useState(false);
   const [isBroadcastWizardOpen, setIsBroadcastWizardOpen] = useState(false);
   const [isPublishShareModalOpen, setIsPublishShareModalOpen] = useState(false);
+  const [isEditCelebrationOpen, setIsEditCelebrationOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'guests' | 'attendance' | 'memories' | 'import' | 'campaigns' | 'card' | 'reminders'>('guests');
   const cardModalRef = useRef<HTMLDivElement>(null);
@@ -539,9 +542,17 @@ export const EventDetailPage: React.FC = () => {
       <div className="bg-white/90 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-[#E9D3D0] shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <span className="px-3.5 py-1 rounded-full bg-[#F2E5E2] text-[#9E6F6D] text-xs font-extrabold uppercase tracking-wider border border-[#E9D3D0]">
-              {event.event_type}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="px-3.5 py-1 rounded-full bg-[#F2E5E2] text-[#9E6F6D] text-xs font-extrabold uppercase tracking-wider border border-[#E9D3D0]">
+                {event.event_type}
+              </span>
+              <button
+                onClick={() => setIsEditCelebrationOpen(true)}
+                className="px-3 py-1 rounded-full bg-[#FAF7F3] hover:bg-[#F2E5E2] text-[#9E6F6D] text-xs font-bold border border-[#E9D3D0] flex items-center gap-1 transition-all"
+              >
+                <Edit2 className="w-3 h-3 text-[#9E6F6D]" /> Edit Event Details
+              </button>
+            </div>
             <h1 className="font-serif text-3xl md:text-4xl font-extrabold text-[#302829] mt-2">{event.title}</h1>
             <p className="text-[#7A6B6C] text-xs mt-1 font-medium">Host: {event.host_name} • Venue: {event.venue_name}</p>
           </div>
@@ -551,21 +562,21 @@ export const EventDetailPage: React.FC = () => {
               onClick={() => setIsBroadcastWizardOpen(true)}
               className="px-6 py-3 rounded-full bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 text-white text-xs font-extrabold flex items-center gap-2 transition-all shadow-xl hover:scale-105 border border-emerald-400"
             >
-              <Send className="w-4 h-4 text-white" /> ✈ BROADCAST INVITATIONS
+              <Send className="w-4 h-4 text-white" /> ✈ SEND INVITATIONS
             </button>
 
             <button
               onClick={() => setIsPublishShareModalOpen(true)}
               className="px-4 py-2.5 rounded-full bg-[#F2E5E2] hover:bg-[#E9D3D0] text-[#9E6F6D] text-xs font-bold border border-[#E9D3D0] flex items-center gap-1.5 transition-colors shadow-sm"
             >
-              <Eye className="w-4 h-4 text-[#9E6F6D]" /> Share & Preview Card
+              <Eye className="w-4 h-4 text-[#9E6F6D]" /> Preview & Share
             </button>
 
             <Link
               to={`/scan/${event.id}`}
               className="px-4 py-2.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold border border-emerald-300 flex items-center gap-1.5 transition-colors shadow-sm"
             >
-              <QrCode className="w-4 h-4 text-emerald-700" /> Scan Guest Passes
+              <QrCode className="w-4 h-4 text-emerald-700" /> Guest Check-in Gate
             </Link>
 
             <Link
@@ -578,22 +589,17 @@ export const EventDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 🌟 SMART STAGE-AWARE BANNER — ONE PRIMARY ACTION 🌟 */}
-      <div className={`p-4 sm:p-5 rounded-2xl border bg-gradient-to-r ${banner.bg} flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4`}>
-        <div className="flex items-center gap-3">
-          <div className="text-3xl">{banner.icon}</div>
-          <div>
-            <p className="font-serif font-extrabold text-[#302829] text-base">{banner.msg}</p>
-            <p className="text-xs text-[#7A6B6C] mt-0.5">{banner.sub}</p>
-          </div>
-        </div>
-        <button
-          onClick={banner.btnAction}
-          className={`px-6 py-3 rounded-full font-extrabold text-xs shadow-lg hover:scale-105 transition-all border whitespace-nowrap ${banner.btnClass}`}
-        >
-          {banner.btnLabel}
-        </button>
-      </div>
+      {/* 🌟 UNIFIED CELEBRATION WORKSPACE JOURNEY & ROADMAP 🌟 */}
+      <CelebrationWorkspaceJourney
+        event={event}
+        guests={guests}
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        onOpenEditEvent={() => setIsEditCelebrationOpen(true)}
+        onOpenPublishModal={() => setIsPublishShareModalOpen(true)}
+        onOpenSendInvitations={() => setIsBroadcastWizardOpen(true)}
+        onOpenScanner={() => setIsScannerModalOpen(true)}
+      />
 
       {/* 🌟 KPI STATS DASHBOARD 🌟 */}
       <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -1905,6 +1911,21 @@ export const EventDetailPage: React.FC = () => {
         loading={scannerLoading}
         error={scannerError}
       />
+
+      {/* EDIT CELEBRATION DETAILS MODAL */}
+      {event && (
+        <EditCelebrationModal
+          isOpen={isEditCelebrationOpen}
+          onClose={() => setIsEditCelebrationOpen(false)}
+          eventData={event}
+          onSuccess={(updatedEvt) => {
+            setEvent(updatedEvt);
+            setIsEditCelebrationOpen(false);
+            setStatusNotice('Event details updated successfully!');
+            setTimeout(() => setStatusNotice(null), 3000);
+          }}
+        />
+      )}
 
     </div>
   );

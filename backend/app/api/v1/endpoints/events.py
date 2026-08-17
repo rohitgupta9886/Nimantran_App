@@ -7,6 +7,7 @@ from app.api.deps import get_db, get_current_user
 from app.schemas.common import ResponseModel
 from app.schemas.event import EventCreate, EventRead, EventUpdate
 from app.schemas.guest import GuestCreate
+from app.schemas.invitation_content import CanonicalInvitationContent
 from app.services.event_service import EventService
 from app.services.guest_service import GuestService
 from app.services.ai_service import AIService
@@ -99,8 +100,8 @@ async def converse_langgraph_assistant(
 ):
     thread_id = payload.get("thread_id") or f"user_{current_user.id}"
     user_message = payload.get("user_message", "")
-    graph_state = await langgraph_event_service.process_user_turn(thread_id, user_message)
-    return ResponseModel(data=graph_state, message="LangGraph State Engine response ready")
+    resp = await ai_service.process_conversation_turn(thread_id, user_message)
+    return ResponseModel(data=resp.model_dump(), message="LangGraph State Engine response ready")
 
 
 @router.post("/ai-converse-assistant", response_model=ResponseModel[dict])
@@ -108,9 +109,10 @@ async def converse_ai_assistant(
     payload: dict,
     current_user: User = Depends(get_current_user),
 ):
+    thread_id = payload.get("thread_id") or f"user_{current_user.id}"
     user_message = payload.get("user_message", "")
     current_memory = payload.get("memory", {})
-    res = await ai_service.converse_and_fill_slots(user_message, current_memory)
+    res = await ai_service.converse_and_fill_slots(user_message, current_memory, thread_id=thread_id)
     return ResponseModel(data=res, message="AI Conversational Assistant response ready")
 
 
@@ -229,13 +231,8 @@ async def get_event(
     db: AsyncSession = Depends(get_db),
 ):
     event = await EventService.get_event_by_id(db, event_id)
-    if not event:
+    if not event or event.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
-    
-    # Ensure current user has access to view/manage this event
-    if event.user_id != current_user.id:
-        event.user_id = current_user.id
-        await db.commit()
 
     return ResponseModel(data=EventRead.model_validate(event))
 
@@ -248,12 +245,8 @@ async def update_event(
     db: AsyncSession = Depends(get_db),
 ):
     event = await EventService.get_event_by_id(db, event_id)
-    if not event:
+    if not event or event.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
-    
-    if event.user_id != current_user.id:
-        event.user_id = current_user.id
-        await db.commit()
     
     updated_event = await EventService.update_event(db, event, payload)
     return ResponseModel(data=EventRead.model_validate(updated_event), message="Celebration details updated successfully!")
@@ -643,17 +636,6 @@ async def dispatch_all_whatsapp_invitations(
     )
 
 
-@router.post("/ai-converse-langgraph", response_model=ResponseModel[dict])
-async def converse_langgraph_assistant(
-    payload: dict,
-    current_user: User = Depends(get_current_user),
-):
-    thread_id = payload.get("thread_id") or f"user_{current_user.id}"
-    user_message = payload.get("user_message", "")
-    graph_state = await langgraph_event_service.process_user_turn(thread_id, user_message)
-    return ResponseModel(data=graph_state, message="LangGraph State Engine response ready")
-
-
 @router.post("/{event_id}/import-master-contacts", response_model=ResponseModel[dict])
 async def import_master_contacts_to_event(
     event_id: str,
@@ -695,47 +677,54 @@ async def import_master_contacts_to_event(
     )
 
 
-@router.get("/{event_id}/rsvp-analytics", response_model=ResponseModel[dict])
-async def get_event_rsvp_analytics(
+@router.get("/{event_id}/invitation-content", response_model=ResponseModel[CanonicalInvitationContent])
+async def get_event_canonical_invitation(
     event_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.models.guest import Guest, RSVPStatus
-
+    """
+    Returns the Canonical Invitation Content for an event.
+    Guarantees that all channels (Web, WhatsApp, SMS, Email, QR Pass, Public Page)
+    consume the exact same factual event ground truth.
+    """
     event = await EventService.get_event_by_id(db, event_id)
     if not event or event.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
-    result = await db.execute(select(Guest).where(Guest.event_id == event_id))
-    guests = result.scalars().all()
-
-    total_guests = len(guests) or 1
-    confirmed = sum(1 for g in guests if g.rsvp_status == RSVPStatus.CONFIRMED)
-    maybe = sum(1 for g in guests if g.rsvp_status == RSVPStatus.MAYBE)
-    not_attending = sum(1 for g in guests if g.rsvp_status == RSVPStatus.NOT_ATTENDING)
-    awaiting = total_guests - (confirmed + maybe + not_attending)
-
-    confirmed_pct = round((confirmed / total_guests) * 100)
-    maybe_pct = round((maybe / total_guests) * 100)
-    not_attending_pct = round((not_attending / total_guests) * 100)
-    awaiting_pct = round((awaiting / total_guests) * 100)
-
-    theme_config = event.theme_config or {}
-    recent_feed = theme_config.get("recent_rsvps", [])
-
+    canonical = await ai_service.get_or_generate_canonical_invitation(
+        event=event,
+        db=db,
+        user_id=current_user.id,
+    )
     return ResponseModel(
-        data={
-            "total_guests": total_guests,
-            "confirmed_count": confirmed,
-            "confirmed_pct": confirmed_pct,
-            "maybe_count": maybe,
-            "maybe_pct": maybe_pct,
-            "not_attending_count": not_attending,
-            "not_attending_pct": not_attending_pct,
-            "awaiting_count": awaiting,
-            "awaiting_pct": awaiting_pct,
-            "recent_rsvps": recent_feed,
-        },
-        message="Real-time RSVP Analytics & Donut Breakdown ready"
+        data=canonical,
+        message="Canonical invitation content loaded successfully"
+    )
+
+
+@router.put("/{event_id}/invitation-content", response_model=ResponseModel[CanonicalInvitationContent])
+async def update_event_canonical_invitation(
+    event_id: str,
+    payload: Dict[str, Any],
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Allows host to live-edit AI copywriting (title, greeting, message, blessing, closing, story)
+    while strictly preserving and validating underlying factual event ground truth.
+    """
+    event = await EventService.get_event_by_id(db, event_id)
+    if not event or event.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    canonical = await ai_service.get_or_generate_canonical_invitation(
+        event=event,
+        ai_content=payload,
+        db=db,
+        user_id=current_user.id,
+    )
+    return ResponseModel(
+        data=canonical,
+        message="Canonical invitation content updated and synchronized across all channels"
     )

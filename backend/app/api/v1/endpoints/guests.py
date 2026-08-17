@@ -9,6 +9,7 @@ from app.services.guest_service import GuestService
 from app.services.event_service import EventService
 from app.services.ai_service import AIService
 from app.integrations.whatsapp.mock_whatsapp import MockWhatsAppProvider
+from app.core.config import settings
 from app.models.user import User
 
 router = APIRouter()
@@ -148,11 +149,11 @@ async def generate_bilingual_wording(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     guest = await GuestService.get_guest_by_id(db, guest_id)
-    if not guest:
+    if not guest or guest.event_id != event.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guest not found")
 
     date_str = event.start_date.strftime("%d %B %Y, %I:%M %p")
-    invitation_url = f"http://127.0.0.1:5174/i/{event.slug}"
+    invitation_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/i/{event.slug or event.id}"
 
     bilingual_data = await ai_service.generate_bilingual_invitation_card(
         db=db,
@@ -192,11 +193,11 @@ async def generate_personalized_wording(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     guest = await GuestService.get_guest_by_id(db, guest_id)
-    if not guest:
+    if not guest or guest.event_id != event.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guest not found")
 
     date_str = event.start_date.strftime("%d %B %Y, %I:%M %p")
-    invitation_url = f"http://127.0.0.1:5174/i/{event.slug}"
+    invitation_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/i/{event.slug or event.id}"
 
     wording = await ai_service.generate_personalized_guest_invitation(
         db=db,
@@ -234,8 +235,8 @@ async def send_whatsapp_invitation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     guest = await GuestService.get_guest_by_id(db, guest_id)
-    if not guest or not guest.phone:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guest phone number missing")
+    if not guest or guest.event_id != event.id or not guest.phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guest not found or phone number missing")
 
     body = payload or {}
     card_format = (body.get("card_format") or body.get("format") or "JPEG").upper()
@@ -258,7 +259,7 @@ async def send_whatsapp_invitation(
 
     cover_image = body.get("cover_image_url") or ai_card.get("cover_image_url") or event.cover_image_url or "https://images.unsplash.com/photo-1519741497674-611481863552?w=1200&auto=format&fit=crop"
     
-    invitation_url = f"http://127.0.0.1:5174/i/{event.slug}"
+    invitation_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/i/{event.slug or event.id}"
     custom_caption = body.get("personalized_caption") or (
         f"✨ *{ai_card.get('shloka_header', '|| श्री गणेशाय नमः ||')}*\n\n"
         f"Dear {guest.name},\n"
@@ -299,10 +300,10 @@ async def send_sms_invitation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     guest = await GuestService.get_guest_by_id(db, guest_id)
-    if not guest or not guest.phone:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guest phone number missing")
+    if not guest or guest.event_id != event.id or not guest.phone:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Guest not found or phone number missing")
 
-    invitation_url = f"http://127.0.0.1:5174/i/{event.slug}"
+    invitation_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/i/{event.slug or event.id}"
     sms_text = f"Dear {guest.name}, {event.host_name} cordially invites you to {event.title} on {event.start_date.strftime('%b %d')}. View your invitation & entry pass: {invitation_url}"
 
     return ResponseModel(

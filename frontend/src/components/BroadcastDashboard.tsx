@@ -30,6 +30,7 @@ export const BroadcastDashboard: React.FC<BroadcastDashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [retryingAll, setRetryingAll] = useState(false);
+  const [cancellingCampaign, setCancellingCampaign] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
 
   // Filters for Guest Delivery Status table
@@ -112,6 +113,22 @@ export const BroadcastDashboard: React.FC<BroadcastDashboardProps> = ({
     }
   };
 
+  // Handle Cancel In-flight Campaign
+  const handleCancelCampaign = async () => {
+    if (!activeCampaign) return;
+    if (!window.confirm('Are you sure you want to cancel this in-flight broadcast? Any pending messages will be halted.')) return;
+    setCancellingCampaign(true);
+    try {
+      const res = await apiFetch(`/campaigns/${activeCampaign.id}/cancel`, { method: 'POST' });
+      showToast(res?.message || 'Campaign cancelled successfully.');
+      loadDashboardData(true);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to cancel campaign.');
+    } finally {
+      setCancellingCampaign(false);
+    }
+  };
+
   // Handle Resend Single Message
   const handleResendSingle = async (messageId: string, guestName: string) => {
     setRetryingMessageId(messageId);
@@ -178,19 +195,31 @@ export const BroadcastDashboard: React.FC<BroadcastDashboardProps> = ({
       <div className="bg-white/95 backdrop-blur-xl p-6 sm:p-8 rounded-3xl border border-[#E9D3D0] shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-[#F2E5E2] text-[#9E6F6D] text-[10px] font-mono font-bold uppercase border border-[#E9D3D0] mb-1.5">
-            Multi-Channel Broadcast Hub
+            INVITATION DELIVERY & TRACKING
           </div>
           <h2 className="font-serif text-3xl font-extrabold text-[#302829]">
-            {activeCampaign ? activeCampaign.title : 'Invitation Broadcasting'}
+            {activeCampaign ? activeCampaign.title : 'Send Celebration Invitations'}
           </h2>
           <p className="text-xs text-[#7A6B6C] mt-0.5 font-medium">
             {activeCampaign
-              ? `Initiated on ${new Date(activeCampaign.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
-              : 'Broadcast personalized invitations to your guest list via WhatsApp, SMS, or Email'}
+              ? `Sent on ${new Date(activeCampaign.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+              : 'Send personalized digital invitations to your guests via WhatsApp, SMS, or Email with one click'}
           </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
+          {activeCampaign && (activeCampaign.status === 'QUEUED' || activeCampaign.status === 'PROCESSING') && (
+            <button
+              onClick={handleCancelCampaign}
+              disabled={cancellingCampaign}
+              className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-800 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+              title="Halt in-flight broadcasts"
+            >
+              <AlertCircle className={`w-3.5 h-3.5 ${cancellingCampaign ? 'animate-spin' : ''}`} />
+              <span>Cancel Broadcast</span>
+            </button>
+          )}
+
           <button
             onClick={() => loadDashboardData(true)}
             className="px-4 py-2.5 rounded-xl bg-[#FAF7F5] hover:bg-[#F2E5E2] border border-[#E9D3D0] text-[#51484A] font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
@@ -205,7 +234,7 @@ export const BroadcastDashboard: React.FC<BroadcastDashboardProps> = ({
             className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 hover:from-emerald-500 hover:to-emerald-600 text-white font-extrabold text-xs shadow-md transition-all flex items-center gap-2 hover:scale-105"
           >
             <Send className="w-4 h-4 text-white" />
-            <span>BROADCAST TO GUESTS</span>
+            <span>SEND INVITATIONS</span>
           </button>
         </div>
       </div>

@@ -24,7 +24,7 @@ class EventService:
             title=data.title,
             slug=slug,
             event_type=data.event_type,
-            status=EventStatus.PUBLISHED,
+            status=getattr(data, "status", None) or EventStatus.DRAFT,
             host_name=data.host_name,
             co_host_name=data.co_host_name,
             contact_phone=data.contact_phone,

@@ -5,8 +5,8 @@ from app.api.deps import get_db
 from app.schemas.common import ResponseModel
 from app.schemas.event import EventRead
 from app.services.event_service import EventService
-
 from app.services.ai_service import AIService
+from app.schemas.invitation_content import CanonicalInvitationContent
 
 router = APIRouter()
 ai_service = AIService()
@@ -34,13 +34,20 @@ async def get_public_event(slug: str, db: AsyncSession = Depends(get_db)):
         headline = "Welcome to the Celebration"
 
     event_data = EventRead.model_validate(event).model_dump()
+    event_data.pop("user_id", None)  # Ensure private internal user_id is never leaked in public APIs
     theme_config = event.theme_config or {}
     wishes = theme_config.get("wishes", [])
     memories = theme_config.get("memories", [])
 
+    canonical = CanonicalInvitationContent.from_event(
+        event=event,
+        ai_content=theme_config.get("canonical_invitation"),
+    )
+
     return ResponseModel(
         data={
             "event": event_data,
+            "canonical_invitation": canonical.model_dump(),
             "lifecycle_phase": phase,
             "headline": headline,
             "wishes": wishes,
@@ -135,7 +142,7 @@ async def submit_public_rsvp(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation link not found.")
 
     guest_name = payload.get("guest_name", "").strip() or "Valued Guest"
-    phone = payload.get("phone", "").strip()
+    phone = payload.get("phone", "").strip() or None
     status_raw = payload.get("status", "CONFIRMED").upper()
 
     if status_raw in ["YES", "CONFIRMED", "ATTENDING"]:
@@ -149,16 +156,23 @@ async def submit_public_rsvp(
     meal_pref = payload.get("meal_preference", "Veg (only)")
     notes = payload.get("notes", "").strip()
 
-    # 1. Find or create guest
-    stmt = select(Guest).where(Guest.event_id == event.id, Guest.name.ilike(f"%{guest_name}%"))
-    res = await db.execute(stmt)
-    guest = res.scalars().first()
+    # 1. Deterministic find or create guest (check phone first, then name)
+    guest = None
+    if phone:
+        stmt_phone = select(Guest).where(Guest.event_id == event.id, Guest.phone == phone)
+        res_phone = await db.execute(stmt_phone)
+        guest = res_phone.scalars().first()
+
+    if not guest:
+        stmt_name = select(Guest).where(Guest.event_id == event.id, Guest.name.ilike(f"%{guest_name}%"))
+        res_name = await db.execute(stmt_name)
+        guest = res_name.scalars().first()
 
     if not guest:
         guest = Guest(
             event_id=event.id,
             name=guest_name,
-            phone=phone or "919800000000",
+            phone=phone,
             relationship="Guest",
             adults_count=adults_count,
             rsvp_status=rsvp_enum,
@@ -168,6 +182,8 @@ async def submit_public_rsvp(
     else:
         guest.rsvp_status = rsvp_enum
         guest.adults_count = adults_count
+        if phone and not guest.phone:
+            guest.phone = phone
 
     # 2. Upsert RSVP record
     stmt_rsvp = select(RSVP).where(RSVP.guest_id == guest.id)
@@ -252,12 +268,19 @@ async def get_public_invitation_by_token(
     await db.commit()
 
     event_data = EventRead.model_validate(event).model_dump()
+    event_data.pop("user_id", None)  # Ensure private internal user_id is never leaked in public APIs
     theme_config = event.theme_config or {}
 
     # Format personalized greeting
     salutation = f"Dear {guest.name}"
     if guest.category and guest.category.value == "FAMILY":
         salutation = f"Dear {guest.name} & Family"
+
+    canonical = CanonicalInvitationContent.from_event(
+        event=event,
+        ai_content=theme_config.get("canonical_invitation"),
+        guest_token=token,
+    )
 
     return ResponseModel(
         data={
@@ -269,6 +292,7 @@ async def get_public_invitation_by_token(
             "adults_count": guest.adults_count,
             "notes": guest.notes,
             "event": event_data,
+            "canonical_invitation": canonical.model_dump(),
             "wishes": theme_config.get("wishes", []),
             "memories": theme_config.get("memories", []),
             "music_url": theme_config.get("music_url", "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3"),

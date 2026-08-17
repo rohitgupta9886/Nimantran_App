@@ -19,6 +19,7 @@ from app.models.campaign import (
     MessageDeliveryStatus,
 )
 from app.schemas.common import ResponseModel
+from app.schemas.invitation_content import CanonicalInvitationContent
 from app.services.whatsapp.meta_cloud_provider import get_whatsapp_provider
 from app.services.whatsapp.phone_utils import normalize_phone_number, mask_phone_number
 from app.services.whatsapp.campaign_worker import campaign_worker
@@ -45,27 +46,18 @@ def generate_personalized_invitation_url(event: Event, guest: Guest) -> str:
 
 def render_invitation_text(event: Event, guest: Guest, invitation_url: str) -> str:
     """
-    Safely renders a personalized invitation text with proper Hindi & English greetings.
+    Renders personalized invitation text strictly using CanonicalInvitationContent
+    to guarantee zero factual discrepancies across channels.
     """
-    host = event.host_name or "Family"
-    title = event.title or "Our Celebration"
-    venue = event.venue_name or "Celebration Venue"
-    date_str = (
-        event.start_date.strftime("%d %B %Y")
-        if event.start_date
-        else "Date TBA"
+    token = guest.invitation_token or guest.id
+    ai_content = (event.theme_config or {}).get("canonical_invitation") if event.theme_config else None
+    canonical = CanonicalInvitationContent.from_event(
+        event=event,
+        ai_content=ai_content,
+        public_base_url=settings.PUBLIC_BASE_URL,
+        guest_token=token,
     )
-
-    return (
-        f"💌 *{host} has something special for you!*\n\n"
-        f"Dear *{guest.name}*,\n\n"
-        f"You are warmly invited to *{title}*.\n\n"
-        f"📅 *Date:* {date_str}\n"
-        f"📍 *Venue:* {venue}\n\n"
-        f"We would be delighted to celebrate this auspicious occasion with you and your family.\n\n"
-        f"✨ *Tap below to open your personalized invitation card & gate pass:*\n"
-        f"{invitation_url}"
-    )
+    return canonical.render_whatsapp_text(guest_name=guest.name, guest_token=token)
 
 
 @router.get("/events/{event_id}/whatsapp/config-status", response_model=ResponseModel[dict])
@@ -77,6 +69,12 @@ async def get_whatsapp_config_status(
     """
     Checks if WhatsApp messaging provider credentials are validly configured in production.
     """
+    # Verify event ownership
+    e_stmt = select(Event).where(Event.id == event_id, Event.user_id == current_user.id)
+    e_res = await db.execute(e_stmt)
+    if not e_res.scalars().first():
+        raise HTTPException(status_code=404, detail="Event not found")
+
     provider = get_whatsapp_provider()
     config_status = await provider.validate_configuration()
 
@@ -105,7 +103,7 @@ async def get_guest_eligibility(
     Calculates guest eligibility counts and identifies invalid phone numbers before broadcasting.
     """
     # Verify event ownership
-    stmt = select(Event).where(Event.id == event_id)
+    stmt = select(Event).where(Event.id == event_id, Event.user_id == current_user.id)
     res = await db.execute(stmt)
     event = res.scalars().first()
     if not event:
@@ -163,7 +161,7 @@ async def get_personalized_preview(
     """
     Generates a personalized message preview for any selected guest.
     """
-    e_stmt = select(Event).where(Event.id == event_id)
+    e_stmt = select(Event).where(Event.id == event_id, Event.user_id == current_user.id)
     e_res = await db.execute(e_stmt)
     event = e_res.scalars().first()
     if not event:
@@ -229,7 +227,7 @@ async def create_broadcast_campaign(
     5. Enqueues message jobs to the background queue worker
     """
     # 1. Verify Event
-    e_stmt = select(Event).where(Event.id == event_id)
+    e_stmt = select(Event).where(Event.id == event_id, Event.user_id == current_user.id)
     e_res = await db.execute(e_stmt)
     event = e_res.scalars().first()
     if not event:
@@ -373,6 +371,11 @@ async def list_event_campaigns(
     """
     Returns list of past and active broadcast campaigns for an event.
     """
+    e_stmt = select(Event).where(Event.id == event_id, Event.user_id == current_user.id)
+    e_res = await db.execute(e_stmt)
+    if not e_res.scalars().first():
+        raise HTTPException(status_code=404, detail="Event not found")
+
     stmt = (
         select(Campaign)
         .where(Campaign.event_id == event_id)
@@ -419,7 +422,11 @@ async def get_campaign_detail(
     """
     Returns real-time progress and guest-level message status list for a campaign.
     """
-    c_stmt = select(Campaign).where(Campaign.id == campaign_id, Campaign.event_id == event_id)
+    c_stmt = (
+        select(Campaign)
+        .join(Event, Campaign.event_id == Event.id)
+        .where(Campaign.id == campaign_id, Campaign.event_id == event_id, Event.user_id == current_user.id)
+    )
     c_res = await db.execute(c_stmt)
     campaign = c_res.scalars().first()
     if not campaign:
@@ -490,9 +497,14 @@ async def retry_broadcast_message(
     """
     Manually retries a failed message in a controlled manner.
     """
-    stmt = select(BroadcastMessage).where(
-        BroadcastMessage.id == message_id,
-        BroadcastMessage.event_id == event_id,
+    stmt = (
+        select(BroadcastMessage)
+        .join(Event, BroadcastMessage.event_id == Event.id)
+        .where(
+            BroadcastMessage.id == message_id,
+            BroadcastMessage.event_id == event_id,
+            Event.user_id == current_user.id,
+        )
     )
     res = await db.execute(stmt)
     msg = res.scalars().first()

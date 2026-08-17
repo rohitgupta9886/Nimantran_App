@@ -105,7 +105,7 @@ async def receive_webhook_event(
             # 6. Apply state machine transition
             if upd.status == "DELIVERED":
                 # Only transition forward from QUEUED/SENDING/SENT
-                if msg.status in (MessageDeliveryStatus.QUEUED, MessageDeliveryStatus.SENDING, MessageDeliveryStatus.SENT):
+                if msg.status in (MessageDeliveryStatus.QUEUED, MessageDeliveryStatus.SENDING, MessageDeliveryStatus.SENT, "QUEUED", "SENDING", "SENT"):
                     msg.status = MessageDeliveryStatus.DELIVERED
                     msg.delivered_at = upd.timestamp
                     await db.execute(

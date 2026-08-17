@@ -127,36 +127,59 @@ class MultiChannelCampaignWorker:
                 await asyncio.sleep(1.0)
 
     async def _process_single_message(self, message_id: str):
-        """Processes an individual multi-channel message job transactionally."""
+        """
+        Processes an individual multi-channel message job transactionally with atomic claiming.
+        Guarantees that multiple concurrent workers or recovery loops never process the same message.
+        """
         async with AsyncSessionLocal() as db:
+            # 1. ATOMIC JOB CLAIM: Only claim if status is QUEUED or RETRYING
+            claim_stmt = (
+                update(BroadcastMessage)
+                .where(
+                    BroadcastMessage.id == message_id,
+                    BroadcastMessage.status.in_([MessageDeliveryStatus.QUEUED, MessageDeliveryStatus.RETRYING]),
+                )
+                .values(
+                    status=MessageDeliveryStatus.SENDING,
+                    attempt_count=BroadcastMessage.attempt_count + 1,
+                    updated_at=datetime.now(timezone.utc),
+                )
+            )
+            claim_res = await db.execute(claim_stmt)
+            if claim_res.rowcount == 0:
+                # Another worker claimed it or message reached a terminal state
+                logger.debug(f"BroadcastMessage {message_id} was already claimed or resolved. Skipping duplicate.")
+                return
+
+            await db.commit()
+
+            # 2. Fetch the claimed message
             stmt = select(BroadcastMessage).where(BroadcastMessage.id == message_id)
             res = await db.execute(stmt)
             msg = res.scalars().first()
 
             if not msg:
-                logger.warning(f"BroadcastMessage {message_id} not found.")
+                logger.warning(f"BroadcastMessage {message_id} not found after claiming.")
                 return
-
-            # Idempotency check: Don't resend if already in terminal/sent state
-            if msg.status in (
-                MessageDeliveryStatus.SENT,
-                MessageDeliveryStatus.DELIVERED,
-                MessageDeliveryStatus.READ,
-                MessageDeliveryStatus.SKIPPED,
-                MessageDeliveryStatus.OPTED_OUT,
-            ):
-                logger.info(f"BroadcastMessage {message_id} already in {msg.status} state. Skipping.")
-                return
-
-            # Mark as SENDING
-            msg.status = MessageDeliveryStatus.SENDING
-            msg.attempt_count += 1
-            msg.updated_at = datetime.now(timezone.utc)
-            await db.commit()
 
             if msg.campaign_id:
                 await self._refresh_campaign_stats(db, msg.campaign_id)
 
+            # 3. PRE-FLIGHT CHECK: Guest Consent & Opt-out Check
+            guest_stmt = select(Guest).where(Guest.id == msg.guest_id)
+            guest_res = await db.execute(guest_stmt)
+            guest = guest_res.scalars().first()
+
+            if guest and (getattr(guest, "delivery_status", None) == "OPTED_OUT" or getattr(guest, "rsvp_status", None) == "OPTED_OUT"):
+                msg.status = MessageDeliveryStatus.OPTED_OUT
+                msg.last_error = "Guest previously opted out of notifications."
+                msg.failed_at = datetime.now(timezone.utc)
+                await db.commit()
+                if msg.campaign_id:
+                    await self._refresh_campaign_stats(db, msg.campaign_id)
+                return
+
+            # 4. DISPATCH BY CHANNEL
             channel = msg.channel
 
             try:
@@ -175,7 +198,7 @@ class MultiChannelCampaignWorker:
             except Exception as ex:
                 logger.error(f"Unexpected exception sending message {message_id}: {ex}", exc_info=True)
                 msg.status = MessageDeliveryStatus.FAILED
-                msg.last_error = f"Internal exception: {str(ex)}"
+                msg.last_error = f"Internal worker exception: {str(ex)}"
                 msg.failed_at = datetime.now(timezone.utc)
                 await db.commit()
 
@@ -184,6 +207,8 @@ class MultiChannelCampaignWorker:
 
     async def _dispatch_whatsapp(self, db: AsyncSession, msg: BroadcastMessage):
         provider = get_whatsapp_provider()
+
+        # Pre-Flight: Recipient Phone Normalization
         is_valid, normalized_phone, reason = normalize_phone_number(msg.recipient)
         if not is_valid or not normalized_phone:
             msg.status = MessageDeliveryStatus.INVALID_NUMBER
@@ -193,6 +218,17 @@ class MultiChannelCampaignWorker:
             return
 
         msg.normalized_phone = normalized_phone
+
+        # Pre-Flight: Validate Provider Configuration in Production Mode
+        config_status = await provider.validate_configuration()
+        if not config_status.is_configured and getattr(settings, "WHATSAPP_PROVIDER", "MOCK").upper() != "MOCK":
+            msg.status = MessageDeliveryStatus.FAILED
+            msg.last_error = f"WhatsApp provider credentials not configured: {', '.join(config_status.missing_keys)}"
+            msg.error_code = "PROVIDER_NOT_CONFIGURED"
+            msg.failed_at = datetime.now(timezone.utc)
+            await db.commit()
+            return
+
         text_to_send = msg.personalized_text or "You are warmly invited to our celebration."
 
         if msg.template_name:
@@ -211,6 +247,7 @@ class MultiChannelCampaignWorker:
             )
 
         if send_res.success:
+            # STRICT RULE: Provider acceptance transitions to SENT, NOT delivered
             msg.status = MessageDeliveryStatus.SENT
             msg.provider_message_id = send_res.provider_message_id
             msg.sent_at = datetime.now(timezone.utc)
@@ -258,6 +295,17 @@ class MultiChannelCampaignWorker:
             return
 
         msg.normalized_phone = normalized_phone
+
+        # Pre-Flight: Validate SMS Provider Configuration
+        config_status = await provider.validate_configuration()
+        if not config_status.is_configured and getattr(settings, "SMS_PROVIDER", "MOCK").upper() != "MOCK":
+            msg.status = MessageDeliveryStatus.FAILED
+            msg.last_error = f"SMS provider credentials not configured: {', '.join(config_status.missing_keys)}"
+            msg.error_code = "PROVIDER_NOT_CONFIGURED"
+            msg.failed_at = datetime.now(timezone.utc)
+            await db.commit()
+            return
+
         text_to_send = msg.personalized_text or "You are warmly invited to our celebration."
 
         send_res = await provider.send_sms(
@@ -309,6 +357,16 @@ class MultiChannelCampaignWorker:
             msg.status = MessageDeliveryStatus.FAILED
             msg.last_error = "Invalid recipient email address"
             msg.error_code = "INVALID_EMAIL"
+            msg.failed_at = datetime.now(timezone.utc)
+            await db.commit()
+            return
+
+        # Pre-Flight: Validate Email Provider Configuration
+        config_status = await provider.validate_configuration()
+        if not config_status.is_configured and getattr(settings, "EMAIL_PROVIDER", "MOCK").upper() != "MOCK":
+            msg.status = MessageDeliveryStatus.FAILED
+            msg.last_error = f"Email provider credentials not configured: {', '.join(config_status.missing_keys)}"
+            msg.error_code = "PROVIDER_NOT_CONFIGURED"
             msg.failed_at = datetime.now(timezone.utc)
             await db.commit()
             return

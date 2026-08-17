@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, Any
-from sqlalchemy import String, Text, Integer, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON
+from sqlalchemy import String, Text, Integer, Boolean, DateTime, ForeignKey, Enum as SQLEnum, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -127,6 +127,11 @@ class BroadcastMessage(Base):
     )
     updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc), nullable=True
+    )
+
+    # Table constraints for database-level idempotency
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "guest_id", "channel", name="uq_broadcast_campaign_guest_channel"),
     )
 
     # Relationships
