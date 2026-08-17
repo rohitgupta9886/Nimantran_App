@@ -11,12 +11,37 @@ from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+MAX_BCRYPT_PASSWORD_BYTES = 72
+
+
+def validate_password_length(password: str) -> None:
+    """Validates that a password is non-empty and does not exceed bcrypt's 72-byte limit."""
+    if not password:
+        raise ValueError("Password cannot be empty.")
+    encoded_len = len(password.encode("utf-8"))
+    if encoded_len > MAX_BCRYPT_PASSWORD_BYTES:
+        raise ValueError(
+            f"Password cannot be longer than {MAX_BCRYPT_PASSWORD_BYTES} bytes (received {encoded_len} UTF-8 bytes). "
+            "Please configure a password with at most 72 UTF-8 bytes."
+        )
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verifies a plain password against a stored bcrypt hash safely."""
+    if not plain_password or not hashed_password:
+        return False
+    # Bcrypt only supports passwords up to 72 bytes; anything longer cannot match
+    if len(plain_password.encode("utf-8")) > MAX_BCRYPT_PASSWORD_BYTES:
+        return False
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 
 def get_password_hash(password: str) -> str:
+    """Generates a secure bcrypt hash for passwords up to 72 bytes."""
+    validate_password_length(password)
     return pwd_context.hash(password)
 
 

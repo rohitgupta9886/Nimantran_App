@@ -126,12 +126,22 @@ async def init_db():
             ]
             session.add_all(templates)
 
-        # 4. Bootstrap Master Admin Account (rohitgupta9886@gmail.com)
-        admin_email = os.getenv("INITIAL_ADMIN_EMAIL", "rohitgupta9886@gmail.com")
-        admin_pass = os.getenv("INITIAL_ADMIN_PASSWORD", "AdminSecurePass2026!")
+        # 4. Bootstrap Master Admin Account
+        admin_email = os.getenv("INITIAL_ADMIN_EMAIL") or os.getenv("ADMIN_EMAIL") or "rohitgupta9886@gmail.com"
+        admin_pass = os.getenv("INITIAL_ADMIN_PASSWORD") or os.getenv("ADMIN_PASSWORD") or "AdminSecurePass2026!"
         res = await session.execute(select(User).where(User.email == admin_email))
         admin_user = res.scalars().first()
         if not admin_user:
+            admin_pass_bytes = len(admin_pass.encode("utf-8"))
+            if admin_pass_bytes > 72:
+                logger.error(
+                    f"INITIAL_ADMIN_PASSWORD / ADMIN_PASSWORD exceeds bcrypt's maximum supported input length of 72 bytes "
+                    f"(received {admin_pass_bytes} bytes). Configure an admin password of at most 72 UTF-8 bytes."
+                )
+                raise ValueError(
+                    f"INITIAL_ADMIN_PASSWORD exceeds bcrypt's maximum supported input length of 72 bytes "
+                    f"(received {admin_pass_bytes} UTF-8 bytes). Please configure an admin password with at most 72 UTF-8 bytes."
+                )
             logger.info(f"Bootstrapping initial Admin account ({admin_email})...")
             admin_user = User(
                 email=admin_email,
