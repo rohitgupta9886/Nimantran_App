@@ -70,37 +70,37 @@ services:
     container_name: nimantran_prod_backend
     restart: always
     environment:
-      - APP_ENV=production
-      - PROJECT_NAME=Nimantran AI
-      - ENABLE_BACKGROUND_WORKERS=false
-      - CORS_ORIGINS=${CORS_ORIGINS}
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimantran_prod}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-      - SECRET_KEY=${SECRET_KEY}
-      - JWT_SECRET=${JWT_SECRET_KEY}
-      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
-      - FRONTEND_URL=${FRONTEND_URL:-${PUBLIC_BASE_URL}}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - WHATSAPP_PROVIDER=${WHATSAPP_PROVIDER:-meta}
-      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
-      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
-      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
-      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}
-      - WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET:-}
-      - SMS_PROVIDER=${SMS_PROVIDER:-generic_http}
-      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
-      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
-      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
-      - FAST2SMS_API_KEY=${FAST2SMS_API_KEY:-}
-      - FAST2SMS_SENDER_ID=${FAST2SMS_SENDER_ID:-}
-      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-smtp}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
-      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Nimantran AI}
-      - LOCAL_STORAGE_DIR=/app/uploads
+      APP_ENV: production
+      PROJECT_NAME: "Nimantran AI"
+      ENABLE_BACKGROUND_WORKERS: "false"
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimantran_prod}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      SECRET_KEY: "${SECRET_KEY:?Error: SECRET_KEY must be set in production}"
+      JWT_SECRET: "${JWT_SECRET_KEY:?Error: JWT_SECRET_KEY must be set in production}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-}"
+      FRONTEND_URL: "${FRONTEND_URL:-${PUBLIC_BASE_URL:-}}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      WHATSAPP_PROVIDER: "${WHATSAPP_PROVIDER:-meta}"
+      WHATSAPP_PHONE_NUMBER_ID: "${WHATSAPP_PHONE_NUMBER_ID:-}"
+      WHATSAPP_ACCESS_TOKEN: "${WHATSAPP_ACCESS_TOKEN:-}"
+      WHATSAPP_BUSINESS_ACCOUNT_ID: "${WHATSAPP_BUSINESS_ACCOUNT_ID:-}"
+      WHATSAPP_VERIFY_TOKEN: "${WHATSAPP_VERIFY_TOKEN:-}"
+      WHATSAPP_APP_SECRET: "${WHATSAPP_APP_SECRET:-}"
+      SMS_PROVIDER: "${SMS_PROVIDER:-generic_http}"
+      TWILIO_ACCOUNT_SID: "${TWILIO_ACCOUNT_SID:-}"
+      TWILIO_AUTH_TOKEN: "${TWILIO_AUTH_TOKEN:-}"
+      TWILIO_FROM_NUMBER: "${TWILIO_FROM_NUMBER:-}"
+      FAST2SMS_API_KEY: "${FAST2SMS_API_KEY:-}"
+      FAST2SMS_SENDER_ID: "${FAST2SMS_SENDER_ID:-}"
+      EMAIL_PROVIDER: "${EMAIL_PROVIDER:-smtp}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM_EMAIL: "${SMTP_FROM_EMAIL:-}"
+      SMTP_FROM_NAME: "${SMTP_FROM_NAME:-Nimantran AI}"
+      LOCAL_STORAGE_DIR: "/app/uploads"
     # Note: No public host port 8000 mapped; accessible only through Nginx
     expose:
       - "8000"
@@ -130,27 +130,27 @@ services:
     restart: always
     command: ["python", "-m", "app.worker"]
     environment:
-      - APP_ENV=production
-      - ENABLE_BACKGROUND_WORKERS=true
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimantran_prod}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-      - SECRET_KEY=${SECRET_KEY}
-      - JWT_SECRET=${JWT_SECRET_KEY}
-      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - WHATSAPP_PROVIDER=${WHATSAPP_PROVIDER:-meta}
-      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
-      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
-      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
-      - SMS_PROVIDER=${SMS_PROVIDER:-generic_http}
-      - FAST2SMS_API_KEY=${FAST2SMS_API_KEY:-}
-      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-smtp}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-587}
-      - SMTP_USER=${SMTP_USER:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
-      - LOCAL_STORAGE_DIR=/app/uploads
+      APP_ENV: production
+      ENABLE_BACKGROUND_WORKERS: "true"
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimantran_prod}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
+      SECRET_KEY: "${SECRET_KEY:?Error: SECRET_KEY must be set in production}"
+      JWT_SECRET: "${JWT_SECRET_KEY:?Error: JWT_SECRET_KEY must be set in production}"
+      PUBLIC_BASE_URL: "${PUBLIC_BASE_URL:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      WHATSAPP_PROVIDER: "${WHATSAPP_PROVIDER:-meta}"
+      WHATSAPP_PHONE_NUMBER_ID: "${WHATSAPP_PHONE_NUMBER_ID:-}"
+      WHATSAPP_ACCESS_TOKEN: "${WHATSAPP_ACCESS_TOKEN:-}"
+      WHATSAPP_BUSINESS_ACCOUNT_ID: "${WHATSAPP_BUSINESS_ACCOUNT_ID:-}"
+      SMS_PROVIDER: "${SMS_PROVIDER:-generic_http}"
+      FAST2SMS_API_KEY: "${FAST2SMS_API_KEY:-}"
+      EMAIL_PROVIDER: "${EMAIL_PROVIDER:-smtp}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM_EMAIL: "${SMTP_FROM_EMAIL:-}"
+      LOCAL_STORAGE_DIR: "/app/uploads"
     volumes:
       - uploads_prod_data:/app/uploads
     depends_on:
