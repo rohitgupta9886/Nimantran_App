@@ -10,6 +10,24 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev_secret_key_change_in_production_min_32_chars!"
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./nimantran.db"
+
+    @property
+    def async_database_url(self) -> str:
+        """
+        Normalizes standard PostgreSQL / SQLite URLs to their respective async drivers (asyncpg / aiosqlite).
+        Handles Render / Cloud database URLs (postgres:// or postgresql://) automatically.
+        """
+        url = self.DATABASE_URL.strip()
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql+psycopg2://"):
+            return url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+        elif url.startswith("sqlite://") and not url.startswith("sqlite+aiosqlite://"):
+            return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+        return url
+
     REDIS_URL: str = "redis://localhost:6379/0"
 
     JWT_SECRET: str = "dev_jwt_secret_key_change_in_production_9999"

@@ -5,11 +5,12 @@ from app.core.config import settings
 
 # Engine configuration for async SQLite or AsyncPG
 connect_args = {}
-if "sqlite" in settings.DATABASE_URL:
+db_url = settings.async_database_url
+if "sqlite" in db_url:
     connect_args = {"check_same_thread": False}
 
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    db_url,
     echo=False,
     future=True,
     connect_args=connect_args,
