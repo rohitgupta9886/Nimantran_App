@@ -41,6 +41,9 @@ RUN mkdir -p /app/uploads && \
 # Copy application source code
 COPY --chown=appuser:appuser . .
 
+# Build-time smoke test to verify all runtime dependencies and schemas load cleanly
+RUN python -c "import app.main, app.worker, app.schemas.auth; print('Production build smoke test passed successfully!')"
+
 USER appuser
 
 EXPOSE 8000
