@@ -11,7 +11,7 @@ from app.models.credit import AIUsage, TransactionType
 class AIService:
 
     def __init__(self):
-        api_key = settings.GOOGLE_API_KEY or settings.AI_API_KEY
+        api_key = settings.effective_gemini_key
         if (settings.AI_PROVIDER.upper() == "GEMINI" or api_key) and api_key and api_key != "mock_key":
             self.provider: AIProvider = GoogleGeminiAIProvider(api_key=api_key)
             self.provider_name = "GEMINI"

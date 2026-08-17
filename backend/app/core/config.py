@@ -13,9 +13,15 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     JWT_SECRET: str = "dev_jwt_secret_key_change_in_production_9999"
+    JWT_SECRET_KEY: Optional[str] = None
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_EXPIRE_MINUTES: int = 43200  # 30 Days Token Lifetime
     JWT_REFRESH_EXPIRE_DAYS: int = 30
+
+    @property
+    def effective_jwt_secret(self) -> str:
+        """Returns JWT secret from either JWT_SECRET_KEY or JWT_SECRET."""
+        return self.JWT_SECRET_KEY or self.JWT_SECRET
 
     # CORS Configuration
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
@@ -35,6 +41,12 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "MOCK"
     AI_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+
+    @property
+    def effective_gemini_key(self) -> Optional[str]:
+        """Returns API key from GEMINI_API_KEY, GOOGLE_API_KEY, or AI_API_KEY."""
+        return self.GEMINI_API_KEY or self.GOOGLE_API_KEY or self.AI_API_KEY
 
     WHATSAPP_PROVIDER: str = "MOCK"
     WHATSAPP_ACCESS_TOKEN: Optional[str] = None

@@ -31,7 +31,7 @@ def create_access_token(
         )
     to_encode = {"exp": expire, "sub": str(subject), "type": "access"}
     encoded_jwt = jwt.encode(
-        to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
+        to_encode, settings.effective_jwt_secret, algorithm=settings.JWT_ALGORITHM
     )
     return encoded_jwt
 
@@ -47,7 +47,7 @@ def create_refresh_token(
         )
     to_encode = {"exp": expire, "sub": str(subject), "type": "refresh"}
     encoded_jwt = jwt.encode(
-        to_encode, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM
+        to_encode, settings.effective_jwt_secret, algorithm=settings.JWT_ALGORITHM
     )
     return encoded_jwt
 
@@ -55,13 +55,13 @@ def create_refresh_token(
 def decode_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(
-            token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM]
+            token, settings.effective_jwt_secret, algorithms=[settings.JWT_ALGORITHM]
         )
         return payload
     except jwt.ExpiredSignatureError:
         try:
             payload = jwt.decode(
-                token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM], options={"verify_exp": False}
+                token, settings.effective_jwt_secret, algorithms=[settings.JWT_ALGORITHM], options={"verify_exp": False}
             )
             return payload
         except jwt.PyJWTError:
