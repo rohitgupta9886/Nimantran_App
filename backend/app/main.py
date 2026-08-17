@@ -20,13 +20,20 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing Nimantran AI Backend Service...")
     os.makedirs(settings.LOCAL_STORAGE_DIR, exist_ok=True)
     await init_db()
-    campaign_worker.start()
-    multi_channel_worker.start()
+    
+    if settings.ENABLE_BACKGROUND_WORKERS:
+        logger.info("Background campaign workers ENABLED in FastAPI process.")
+        campaign_worker.start()
+        multi_channel_worker.start()
+    else:
+        logger.info("Background campaign workers DISABLED in FastAPI process (dedicated worker mode active).")
+        
     yield
+    
     logger.info("Shutting down Nimantran AI Backend Service...")
-    campaign_worker.stop()
-    multi_channel_worker.stop()
-
+    if settings.ENABLE_BACKGROUND_WORKERS:
+        campaign_worker.stop()
+        multi_channel_worker.stop()
 
 
 app = FastAPI(
@@ -35,10 +42,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Set up CORS
+# Set up CORS with environment-driven allowed origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

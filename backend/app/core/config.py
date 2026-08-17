@@ -17,12 +17,19 @@ class Settings(BaseSettings):
     JWT_ACCESS_EXPIRE_MINUTES: int = 43200  # 30 Days Token Lifetime
     JWT_REFRESH_EXPIRE_DAYS: int = 30
 
-    # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-    ]
+    # CORS Configuration
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Parses comma-separated CORS_ORIGINS into a clean sanitized list of allowed origin URLs."""
+        if not self.CORS_ORIGINS or self.CORS_ORIGINS.strip() == "*":
+            return ["*"] if self.APP_ENV == "development" else ["http://localhost:5173"]
+        origins = [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        return origins if origins else ["http://localhost:5173"]
+
+    # Background Workers Switch (True in standalone/dev, False in API-only containers)
+    ENABLE_BACKGROUND_WORKERS: bool = True
 
     # External Provider Defaults / Mode
     AI_PROVIDER: str = "MOCK"

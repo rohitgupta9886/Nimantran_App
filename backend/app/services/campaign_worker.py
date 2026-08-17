@@ -31,6 +31,7 @@ class MultiChannelCampaignWorker:
     def __init__(self, dispatch_delay_seconds: float = 0.1):
         self.dispatch_delay = dispatch_delay_seconds
         self.queue: asyncio.Queue[str] = asyncio.Queue()  # Holds message_id
+        self._queued_set: set[str] = set()
         self.is_running = False
         self._worker_task: Optional[asyncio.Task] = None
 
@@ -51,7 +52,9 @@ class MultiChannelCampaignWorker:
 
     async def enqueue_message(self, message_id: str):
         """Enqueues a single message job."""
-        await self.queue.put(message_id)
+        if message_id not in self._queued_set:
+            self._queued_set.add(message_id)
+            await self.queue.put(message_id)
 
     async def enqueue_campaign(self, campaign_id: str):
         """Enqueues all pending/retrying messages for a given campaign."""
@@ -67,26 +70,38 @@ class MultiChannelCampaignWorker:
             res = await db.execute(stmt)
             message_ids = res.scalars().all()
 
+            enqueued_count = 0
             for msg_id in message_ids:
-                await self.queue.put(msg_id)
+                if msg_id not in self._queued_set:
+                    self._queued_set.add(msg_id)
+                    await self.queue.put(msg_id)
+                    enqueued_count += 1
 
-            logger.info(f"Enqueued {len(message_ids)} message jobs for Campaign {campaign_id}")
+            logger.info(f"Enqueued {enqueued_count} message jobs for Campaign {campaign_id}")
 
     async def _recover_pending_jobs(self):
         """Finds any orphaned QUEUED or RETRYING messages on startup and enqueues them."""
         try:
             async with AsyncSessionLocal() as db:
-                stmt = select(BroadcastMessage.id).where(
-                    BroadcastMessage.status.in_([MessageDeliveryStatus.QUEUED, MessageDeliveryStatus.RETRYING])
+                stmt = (
+                    select(BroadcastMessage.id)
+                    .where(
+                        BroadcastMessage.status.in_([MessageDeliveryStatus.QUEUED, MessageDeliveryStatus.RETRYING])
+                    )
+                    .limit(100)
                 )
                 res = await db.execute(stmt)
                 pending_ids = res.scalars().all()
 
+                recovered_count = 0
                 for msg_id in pending_ids:
-                    await self.queue.put(msg_id)
+                    if msg_id not in self._queued_set:
+                        self._queued_set.add(msg_id)
+                        await self.queue.put(msg_id)
+                        recovered_count += 1
 
-                if pending_ids:
-                    logger.info(f"Recovered {len(pending_ids)} pending multi-channel broadcast jobs from database.")
+                if recovered_count > 0:
+                    logger.info(f"Recovered {recovered_count} pending multi-channel broadcast jobs from database.")
         except Exception as ex:
             logger.error(f"Error during job recovery: {ex}")
 
@@ -94,7 +109,14 @@ class MultiChannelCampaignWorker:
         """Main worker loop processing queue items with rate limiting and retry handling."""
         while self.is_running:
             try:
-                message_id = await self.queue.get()
+                try:
+                    message_id = await asyncio.wait_for(self.queue.get(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    # Periodically check DB for any pending/orphaned jobs created by API containers
+                    await self._recover_pending_jobs()
+                    continue
+
+                self._queued_set.discard(message_id)
                 await self._process_single_message(message_id)
                 self.queue.task_done()
                 await asyncio.sleep(self.dispatch_delay)

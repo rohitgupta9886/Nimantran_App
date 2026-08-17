@@ -3,11 +3,13 @@ version: '3.8'
 # ==============================================================================
 # Nimantran AI — Production Docker Compose Configuration
 #
-# Production Security Architecture:
-# - Only Nginx / Frontend exposes public HTTP/HTTPS (Port 80/443).
-# - PostgreSQL (5432), Redis (6379), and FastAPI (8000) are isolated within
-#   the internal 'nimantran_prod_net' network and NOT exposed to host ports.
-# - Requires environment variables configured via `.env` or CI/CD secrets.
+# Production Security & Process Architecture:
+# - Web Entrypoint: Only Nginx / Frontend exposes public HTTP/HTTPS (Port 80/443).
+# - FastAPI Container: Runs API only (ENABLE_BACKGROUND_WORKERS=false). Internal 8000.
+# - Worker Container: Runs dedicated background worker (python -m app.worker).
+# - PostgreSQL & Redis: Internal to 'nimantran_prod_net' only (no host ports).
+# - Redis Authentication: Mandatory password protection (--requirepass).
+# - Fail-Fast Secrets: Mandatory production secrets fail fast if omitted.
 # ==============================================================================
 
 services:
@@ -37,20 +39,21 @@ services:
       - nimantran_prod_net
 
   # ----------------------------------------------------------------------------
-  # 2. Redis Cache & Queue Broker (Internal Only)
+  # 2. Redis Cache & Queue Broker (Internal Only, Auth Mandatory)
   # ----------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
     container_name: nimantran_prod_redis
     restart: always
-    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-}"
+    command: >
+      redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:?Error: REDIS_PASSWORD must be set in production}"
     # Note: No public host ports mapped in production
     expose:
       - "6379"
     volumes:
       - redis_prod_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,7 +61,7 @@ services:
       - nimantran_prod_net
 
   # ----------------------------------------------------------------------------
-  # 3. FastAPI Backend Application Service (Internal Only)
+  # 3. FastAPI Backend Application Service (API Only, Internal Port 8000)
   # ----------------------------------------------------------------------------
   backend:
     build:
@@ -69,8 +72,10 @@ services:
     environment:
       - APP_ENV=production
       - PROJECT_NAME=Nimantran AI
+      - ENABLE_BACKGROUND_WORKERS=false
+      - CORS_ORIGINS=${CORS_ORIGINS}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimantran_prod}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - SECRET_KEY=${SECRET_KEY}
       - JWT_SECRET=${JWT_SECRET_KEY}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
@@ -115,7 +120,7 @@ services:
       - nimantran_prod_net
 
   # ----------------------------------------------------------------------------
-  # 4. Asynchronous Campaign Queue Worker Service (Internal Only)
+  # 4. Dedicated Campaign Queue Worker Service (Campaign Processing Only)
   # ----------------------------------------------------------------------------
   worker:
     build:
@@ -123,11 +128,12 @@ services:
       dockerfile: Dockerfile
     container_name: nimantran_prod_worker
     restart: always
-    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    command: ["python", "-m", "app.worker"]
     environment:
       - APP_ENV=production
+      - ENABLE_BACKGROUND_WORKERS=true
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimantran_prod}
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - SECRET_KEY=${SECRET_KEY}
       - JWT_SECRET=${JWT_SECRET_KEY}
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
