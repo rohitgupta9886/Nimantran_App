@@ -23,64 +23,70 @@ logger = logging.getLogger("nimantran_ai")
 
 async def init_db():
     from sqlalchemy import text as sa_text
+    from app.core.config import settings
+
     async with engine.begin() as conn:
         logger.info("Creating database tables if not present...")
         await conn.run_sync(Base.metadata.create_all)
 
-        # Auto-migrate SQLite schema for guests, users, campaigns, audit_logs if new columns are missing
-        cols_to_add = [
-            ("guests", "invitation_token", "VARCHAR"),
-            ("guests", "delivery_status", "VARCHAR DEFAULT 'SENT'"),
-            ("guests", "delivered_at", "DATETIME"),
-            ("guests", "first_opened_at", "DATETIME"),
-            ("guests", "last_opened_at", "DATETIME"),
-            ("guests", "open_count", "INTEGER DEFAULT 0"),
-            ("users", "last_login_at", "DATETIME"),
-            ("users", "is_deleted", "BOOLEAN DEFAULT 0"),
-            ("audit_logs", "actor_name", "VARCHAR"),
-            ("audit_logs", "actor_role", "VARCHAR"),
-            ("audit_logs", "target_type", "VARCHAR"),
-            ("audit_logs", "target_id", "VARCHAR"),
-            ("campaigns", "channels_list", "JSON"),
-            ("campaigns", "email_subject", "VARCHAR"),
-            ("campaigns", "email_body_html", "TEXT"),
-            ("campaigns", "idempotency_key", "VARCHAR"),
-            ("campaigns", "created_by", "VARCHAR"),
-            ("campaigns", "template_name", "VARCHAR"),
-            ("campaigns", "template_language", "VARCHAR DEFAULT 'hi'"),
-            ("campaigns", "total_recipients", "INTEGER DEFAULT 0"),
-            ("campaigns", "queued_count", "INTEGER DEFAULT 0"),
-            ("campaigns", "sending_count", "INTEGER DEFAULT 0"),
-            ("campaigns", "delivered_count", "INTEGER DEFAULT 0"),
-            ("campaigns", "read_count", "INTEGER DEFAULT 0"),
-            ("campaigns", "invalid_count", "INTEGER DEFAULT 0"),
-            ("campaigns", "skipped_count", "INTEGER DEFAULT 0"),
-            ("campaigns", "started_at", "DATETIME"),
-            ("campaigns", "completed_at", "DATETIME"),
-            ("campaigns", "updated_at", "DATETIME"),
-            ("broadcast_messages", "normalized_phone", "VARCHAR"),
-            ("broadcast_messages", "template_name", "VARCHAR"),
-            ("broadcast_messages", "personalized_payload", "JSON"),
-            ("broadcast_messages", "personalized_text", "TEXT"),
-            ("broadcast_messages", "email_subject", "VARCHAR"),
-            ("broadcast_messages", "email_body_html", "TEXT"),
-            ("broadcast_messages", "invitation_url", "VARCHAR"),
-            ("broadcast_messages", "idempotency_key", "VARCHAR"),
-            ("broadcast_messages", "attempt_count", "INTEGER DEFAULT 0"),
-            ("broadcast_messages", "max_attempts", "INTEGER DEFAULT 3"),
-            ("broadcast_messages", "last_error", "TEXT"),
-            ("broadcast_messages", "error_code", "VARCHAR"),
-            ("broadcast_messages", "queued_at", "DATETIME"),
-            ("broadcast_messages", "delivered_at", "DATETIME"),
-            ("broadcast_messages", "read_at", "DATETIME"),
-            ("broadcast_messages", "failed_at", "DATETIME"),
-            ("broadcast_messages", "updated_at", "DATETIME"),
-        ]
-        for tbl_name, col_name, col_type in cols_to_add:
-            try:
-                await conn.execute(sa_text(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} {col_type}"))
-            except Exception:
-                pass
+        # Auto-migrate SQLite schema for legacy local database files if new columns are missing
+        if "sqlite" in settings.async_database_url:
+            cols_to_add = [
+                ("guests", "invitation_token", "VARCHAR"),
+                ("guests", "delivery_status", "VARCHAR DEFAULT 'SENT'"),
+                ("guests", "delivered_at", "DATETIME"),
+                ("guests", "first_opened_at", "DATETIME"),
+                ("guests", "last_opened_at", "DATETIME"),
+                ("guests", "open_count", "INTEGER DEFAULT 0"),
+                ("users", "last_login_at", "DATETIME"),
+                ("users", "is_deleted", "BOOLEAN DEFAULT 0"),
+                ("audit_logs", "actor_name", "VARCHAR"),
+                ("audit_logs", "actor_role", "VARCHAR"),
+                ("audit_logs", "target_type", "VARCHAR"),
+                ("audit_logs", "target_id", "VARCHAR"),
+                ("campaigns", "channels_list", "JSON"),
+                ("campaigns", "email_subject", "VARCHAR"),
+                ("campaigns", "email_body_html", "TEXT"),
+                ("campaigns", "idempotency_key", "VARCHAR"),
+                ("campaigns", "created_by", "VARCHAR"),
+                ("campaigns", "template_name", "VARCHAR"),
+                ("campaigns", "template_language", "VARCHAR DEFAULT 'hi'"),
+                ("campaigns", "total_recipients", "INTEGER DEFAULT 0"),
+                ("campaigns", "queued_count", "INTEGER DEFAULT 0"),
+                ("campaigns", "sending_count", "INTEGER DEFAULT 0"),
+                ("campaigns", "delivered_count", "INTEGER DEFAULT 0"),
+                ("campaigns", "read_count", "INTEGER DEFAULT 0"),
+                ("campaigns", "invalid_count", "INTEGER DEFAULT 0"),
+                ("campaigns", "skipped_count", "INTEGER DEFAULT 0"),
+                ("campaigns", "started_at", "DATETIME"),
+                ("campaigns", "completed_at", "DATETIME"),
+                ("campaigns", "updated_at", "DATETIME"),
+                ("broadcast_messages", "normalized_phone", "VARCHAR"),
+                ("broadcast_messages", "template_name", "VARCHAR"),
+                ("broadcast_messages", "personalized_payload", "JSON"),
+                ("broadcast_messages", "personalized_text", "TEXT"),
+                ("broadcast_messages", "email_subject", "VARCHAR"),
+                ("broadcast_messages", "email_body_html", "TEXT"),
+                ("broadcast_messages", "invitation_url", "VARCHAR"),
+                ("broadcast_messages", "idempotency_key", "VARCHAR"),
+                ("broadcast_messages", "attempt_count", "INTEGER DEFAULT 0"),
+                ("broadcast_messages", "max_attempts", "INTEGER DEFAULT 3"),
+                ("broadcast_messages", "last_error", "TEXT"),
+                ("broadcast_messages", "error_code", "VARCHAR"),
+                ("broadcast_messages", "queued_at", "DATETIME"),
+                ("broadcast_messages", "delivered_at", "DATETIME"),
+                ("broadcast_messages", "read_at", "DATETIME"),
+                ("broadcast_messages", "failed_at", "DATETIME"),
+                ("broadcast_messages", "updated_at", "DATETIME"),
+            ]
+            for tbl_name, col_name, col_type in cols_to_add:
+                try:
+                    res = await conn.execute(sa_text(f"PRAGMA table_info({tbl_name})"))
+                    existing_cols = {row[1] for row in res.fetchall()}
+                    if col_name not in existing_cols:
+                        await conn.execute(sa_text(f"ALTER TABLE {tbl_name} ADD COLUMN {col_name} {col_type}"))
+                except Exception as e:
+                    logger.debug(f"SQLite column migration check: {e}")
 
     async with AsyncSessionLocal() as session:
         # 1. Seed Plans
