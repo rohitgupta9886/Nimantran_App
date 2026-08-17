@@ -7,14 +7,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-nimantran}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nimantran_secure_password_2026}
-      POSTGRES_DB: ${POSTGRES_DB:-nimantran_db}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-nimantran_dev}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nimantran} -d ${POSTGRES_DB:-nimantran_db}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nimantran} -d ${POSTGRES_DB:-nimantran_dev}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -44,11 +44,11 @@ services:
     container_name: nimantran_backend
     restart: unless-stopped
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD:-nimantran_secure_password_2026}@postgres:5432/${POSTGRES_DB:-nimantran_db}
-      - REDIS_URL=redis://redis:6379/0
-      - APP_ENV=production
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-nimantran_jwt_super_secret_production_key_2026}
-      - CORS_ORIGINS=*
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-nimantran_dev}}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - APP_ENV=${APP_ENV:-development}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-nimantran_dev_secret_key_change_in_production}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
     ports:
       - "8000:8000"
     volumes:

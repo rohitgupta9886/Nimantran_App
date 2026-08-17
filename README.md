@@ -11,6 +11,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5+-3178C6.svg?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-State_Engine-FF6F00.svg?logo=langchain&logoColor=white)](https://langchain.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC.svg?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -22,6 +23,18 @@
 **Nimantran AI** is a production-grade, full-stack celebration OS built specifically for modern Indian and multicultural celebrations (Weddings, Sangeet, Mehendi, Anniversaries, Birthdays, Housewarmings, Corporate Galas, and Festivals).
 
 It replaces fragmented wedding planning workflows with an integrated, intelligent platform that automates event design, guest list curation, luxury digital cards, multi-channel messaging (WhatsApp, SMS, Email), live QR check-ins, and venue TV welcome screens.
+
+---
+
+## 🏛️ Environment Matrix: Development vs. Production
+
+| Dimension | Local Development | Production Environment |
+| :--- | :--- | :--- |
+| **Database** | **SQLite** (`sqlite+aiosqlite`) default zero-setup or local PostgreSQL | **PostgreSQL 16+** (`postgresql+asyncpg`) with persistent volume & connection pooling |
+| **Cache / Queue** | In-memory asyncio background worker / local Redis | **Redis 7+** (AOF enabled, protected auth mode) |
+| **Network & Ports** | `localhost:5173` (Vite), `localhost:8000` (FastAPI), direct access | **Nginx Gateway (80/443)** only. PostgreSQL (5432), Redis (6379), and FastAPI (8000) are internal to Docker network |
+| **Orchestration** | Python venv + Vite OR `docker compose up --build` | `docker compose -f docker-compose.prod.yml up -d` OR Kubernetes (`k8s/`) |
+| **Secrets** | `.env` (ignored by Git) | Environment variables injected via Vault / AWS Secrets / CI/CD |
 
 ---
 
@@ -64,46 +77,37 @@ It replaces fragmented wedding planning workflows with an integrated, intelligen
 
 ```mermaid
 flowchart TD
-    subgraph Frontend["Frontend Client (React 19 + TypeScript + Vite)"]
-        UI[Host Dashboard & Wizard]
-        GuestPage[Live Invitation Page /i/:slug]
-        Scanner[QR Camera Scanner /scan/:id]
-        TVScreen[Venue TV Welcome Display /live-screen/:id]
+    subgraph Public["Public Internet (Port 80 / 443)"]
+        Nginx["Nginx Reverse Proxy / Load Balancer"]
     end
 
-    subgraph Backend["Backend API (FastAPI + Python 3.11+)"]
-        API[FastAPI Router /api/v1]
-        Auth[JWT Auth & RBAC]
-        AI[LangGraph Event Engine + Gemini 1.5]
-        Worker[Multi-Channel Background Queue Worker]
-        WSServer[WebSocket Hub]
+    subgraph InternalNet["Isolated Internal Network (nimantran_prod_net)"]
+        Frontend["Frontend SPA (React 19)"]
+        Backend["FastAPI Backend (Port 8000)"]
+        Worker["Campaign Queue Worker (Asyncio / Redis)"]
+        Postgres[(PostgreSQL 16 Database)]
+        Redis[(Redis 7 Cache / Broker)]
     end
 
-    subgraph Messaging["External Providers Layer"]
-        MetaWA[Meta WhatsApp Cloud API]
-        SMS[Twilio / Fast2SMS Gateway]
-        SMTP[SMTP Luxury Email Service]
+    subgraph External["External Services"]
+        MetaWA["Meta WhatsApp Cloud API"]
+        SMS["Twilio / Fast2SMS"]
+        SMTP["SMTP Email Service"]
+        Gemini["Google Gemini 1.5 API"]
     end
 
-    subgraph Storage["Data Persistence"]
-        DB[(SQLite / PostgreSQL + SQLAlchemy Async)]
-        Files[(Local / S3 Media Storage)]
-    end
-
-    UI -->|REST API| API
-    GuestPage -->|REST API| API
-    Scanner -->|REST API| API
-    TVScreen -->|WebSocket| WSServer
-    API --> Auth
-    API --> AI
-    API --> Worker
-    API --> DB
+    Public --> Nginx
+    Nginx -->|/ | Frontend
+    Nginx -->|/api/ | Backend
+    Nginx -->|/uploads/ | Backend
+    Backend --> Postgres
+    Backend --> Redis
+    Backend --> Gemini
+    Worker --> Postgres
+    Worker --> Redis
     Worker --> MetaWA
     Worker --> SMS
     Worker --> SMTP
-    MetaWA -->|Webhooks| API
-    SMS -->|Webhooks| API
-    SMTP -->|Webhooks| API
 ```
 
 ---
@@ -116,12 +120,12 @@ flowchart TD
 | **Backend** | FastAPI, Python 3.11+, SQLAlchemy 2.0 (Async), Pydantic v2, Uvicorn, Asyncio |
 | **AI & LLM** | LangGraph State Machine, LangChain, Google Gemini 1.5 Flash API |
 | **Messaging** | Meta WhatsApp Cloud API (v21.0), Twilio REST API, Fast2SMS API, Python smtplib / aiosmtplib |
-| **Database** | SQLite with `aiosqlite` (Default Dev) / PostgreSQL with `asyncpg` (Production) |
+| **Database** | SQLite with `aiosqlite` (Development) / PostgreSQL with `asyncpg` (Production) |
 | **Security** | Passlib (Bcrypt), PyJWT (HMAC-SHA256), CORS Middleware, Strict Input Sanitization |
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Quick Start Guide (Local Development)
 
 ### Prerequisites
 - **Node.js** v18.0.0 or higher (`node -v`)
@@ -132,8 +136,8 @@ flowchart TD
 
 ### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/your-username/nimantran-ai.git
-cd nimantran-ai
+git clone https://github.com/rohitgupta9886/Nimantran_App.git
+cd Nimantran_App
 ```
 
 ---
@@ -152,6 +156,10 @@ cd nimantran-ai
    # On Windows (PowerShell):
    python -m venv venv
    .\venv\Scripts\Activate.ps1
+
+   # On Windows (Command Prompt):
+   python -m venv venv
+   .\venv\Scripts\activate.bat
    ```
 3. Install dependencies:
    ```bash
@@ -161,12 +169,12 @@ cd nimantran-ai
    ```bash
    cp .env.example .env
    ```
-   *Edit `.env` to configure your `SECRET_KEY`, `GEMINI_API_KEY`, and provider settings.*
+   *(For development, SQLite is used out-of-the-box. Add your `GEMINI_API_KEY` for AI features.)*
 5. Run the backend server:
    ```bash
    uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
    ```
-   Backend will be running at `http://127.0.0.1:8000`. Interactive Swagger API docs are available at `http://127.0.0.1:8000/docs`.
+   Backend will be running at `http://127.0.0.1:8000`. Swagger API docs are live at `http://127.0.0.1:8000/docs`.
 
 ---
 
@@ -187,32 +195,52 @@ cd nimantran-ai
 
 ---
 
-## ⚙️ Environment Configuration (`.env`)
+### Step 4: Alternative Local Setup with Docker Compose
+To run the full stack (Frontend, Backend, PostgreSQL, Redis) locally using Docker:
 
-A sanitized template is provided in [.env.example](file:///.env.example):
-
-```env
-# Application Settings
-PROJECT_NAME="Nimantran AI"
-ENV=development
-PORT=8000
-PUBLIC_BASE_URL="http://localhost:5173"
-
-# JWT Auth
-SECRET_KEY="your-super-secret-jwt-key"
-JWT_ACCESS_EXPIRE_MINUTES=1440
-
-# Database URL (SQLite or PostgreSQL)
-DATABASE_URL="sqlite+aiosqlite:///./nimantran.db"
-
-# Google Gemini AI
-GEMINI_API_KEY="your_gemini_api_key_here"
-
-# Messaging Providers (set to 'mock' for local simulation)
-WHATSAPP_PROVIDER_MODE="mock"
-SMS_PROVIDER="mock"
-EMAIL_PROVIDER="mock"
+```bash
+docker compose up --build
 ```
+
+---
+
+## 🚢 Production Deployment
+
+### 1. Production Docker Compose (`docker-compose.prod.yml`)
+
+The production Compose architecture enforces strict network isolation:
+- **Only Nginx / Frontend** exposes port `80` and `443` publicly.
+- **PostgreSQL (5432)**, **Redis (6379)**, and **FastAPI (8000)** are kept internal to the Docker network.
+
+```bash
+# 1. Create production environment configuration from template
+cp .env.production.example .env.production
+
+# 2. Configure your production domain, PostgreSQL password, JWT secret, and messaging credentials
+# (Edit .env.production)
+
+# 3. Launch hardened production stack
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+### 2. Kubernetes Deployment (`k8s/`)
+
+Production manifests with Ingress, PersistentVolumeClaims, HorizontalPodAutoscalers, and ConfigMaps:
+
+```bash
+kubectl apply -k k8s/
+```
+
+---
+
+## ⚙️ Environment Configuration
+
+| File | Purpose | Version Controlled? |
+| :--- | :--- | :--- |
+| `.env.example` | Local development configuration template | ✅ Yes |
+| `.env.production.example` | Production environment template with all providers | ✅ Yes |
+| `.env` | Local machine active configuration | ❌ No (Ignored by Git) |
+| `.env.production` | Production server active credentials | ❌ No (Ignored by Git) |
 
 > [!NOTE]
 > When `WHATSAPP_PROVIDER_MODE="mock"`, `SMS_PROVIDER="mock"`, and `EMAIL_PROVIDER="mock"`, the system runs an automated background delivery simulator with real database state updates without requiring external API keys.
@@ -239,7 +267,7 @@ npx tsc --noEmit
 ## 📁 Repository Structure
 
 ```
-nimantran-ai/
+Nimantran_App/
 ├── backend/
 │   ├── app/
 │   │   ├── api/v1/endpoints/   # REST routes (auth, events, guests, campaigns, webhooks)
@@ -260,9 +288,14 @@ nimantran-ai/
 │   │   ├── services/           # Client API layer, sharing service
 │   │   └── utils/              # Export utilities, theme engines
 │   ├── package.json            # Node.js dependencies
+│   ├── nginx.conf              # Production Nginx reverse proxy configuration
 │   └── vite.config.ts          # Vite build config
+├── k8s/                        # Production Kubernetes manifests
+├── docker-compose.yml          # Local development Docker Compose
+├── docker-compose.prod.yml     # Hardened production Docker Compose (isolated network)
 ├── .gitignore                  # Master Git ignore (protects secrets, DBs, logs)
 ├── .env.example                # Root environment template
+├── .env.production.example     # Production environment template
 └── README.md                   # Project documentation
 ```
 
@@ -270,7 +303,8 @@ nimantran-ai/
 
 ## 🔒 Security & Privacy Practices
 
-- **Zero Secret Leakage**: All `.env`, `*.key`, `*.pem`, `*.db`, and token files are ignored in `.gitignore`.
+- **Zero Secret Leakage**: All `.env`, `.env.*`, `*.key`, `*.pem`, `*.db`, and token files are strictly ignored in `.gitignore`.
+- **Internal Network Isolation**: PostgreSQL, Redis, and FastAPI are not exposed to the public internet in production.
 - **HMAC Webhook Verification**: Meta WhatsApp webhooks require valid SHA-256 HMAC signature verification (`X-Hub-Signature-256`).
 - **Atomic Idempotency**: Broadcast campaigns enforce deduplication tokens (`idempotency_key`) preventing double-billing or duplicate messages.
 - **Password Hashing**: Modern Bcrypt hashing with salted iterations.

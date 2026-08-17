@@ -1,0 +1,196 @@
+version: '3.8'
+
+# ==============================================================================
+# Nimantran AI — Production Docker Compose Configuration
+#
+# Production Security Architecture:
+# - Only Nginx / Frontend exposes public HTTP/HTTPS (Port 80/443).
+# - PostgreSQL (5432), Redis (6379), and FastAPI (8000) are isolated within
+#   the internal 'nimantran_prod_net' network and NOT exposed to host ports.
+# - Requires environment variables configured via `.env` or CI/CD secrets.
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. PostgreSQL Database Service (Internal Only)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: nimantran_prod_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nimantran}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Error: POSTGRES_PASSWORD must be set in production}"
+      POSTGRES_DB: ${POSTGRES_DB:-nimantran_prod}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    # Note: No public host ports mapped in production
+    expose:
+      - "5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nimantran} -d ${POSTGRES_DB:-nimantran_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nimantran_prod_net
+
+  # ----------------------------------------------------------------------------
+  # 2. Redis Cache & Queue Broker (Internal Only)
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: nimantran_prod_redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-}"
+    # Note: No public host ports mapped in production
+    expose:
+      - "6379"
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nimantran_prod_net
+
+  # ----------------------------------------------------------------------------
+  # 3. FastAPI Backend Application Service (Internal Only)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nimantran_prod_backend
+    restart: always
+    environment:
+      - APP_ENV=production
+      - PROJECT_NAME=Nimantran AI
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimantran_prod}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET=${JWT_SECRET_KEY}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
+      - FRONTEND_URL=${FRONTEND_URL:-${PUBLIC_BASE_URL}}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - WHATSAPP_PROVIDER=${WHATSAPP_PROVIDER:-meta}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
+      - WHATSAPP_VERIFY_TOKEN=${WHATSAPP_VERIFY_TOKEN:-}
+      - WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET:-}
+      - SMS_PROVIDER=${SMS_PROVIDER:-generic_http}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
+      - FAST2SMS_API_KEY=${FAST2SMS_API_KEY:-}
+      - FAST2SMS_SENDER_ID=${FAST2SMS_SENDER_ID:-}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-smtp}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Nimantran AI}
+      - LOCAL_STORAGE_DIR=/app/uploads
+    # Note: No public host port 8000 mapped; accessible only through Nginx
+    expose:
+      - "8000"
+    volumes:
+      - uploads_prod_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - nimantran_prod_net
+
+  # ----------------------------------------------------------------------------
+  # 4. Asynchronous Campaign Queue Worker Service (Internal Only)
+  # ----------------------------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nimantran_prod_worker
+    restart: always
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-nimantran}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nimantran_prod}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET=${JWT_SECRET_KEY}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - WHATSAPP_PROVIDER=${WHATSAPP_PROVIDER:-meta}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
+      - SMS_PROVIDER=${SMS_PROVIDER:-generic_http}
+      - FAST2SMS_API_KEY=${FAST2SMS_API_KEY:-}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-smtp}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
+      - LOCAL_STORAGE_DIR=/app/uploads
+    volumes:
+      - uploads_prod_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nimantran_prod_net
+
+  # ----------------------------------------------------------------------------
+  # 5. Frontend & Nginx Gateway Service (Public Entrypoint)
+  # ----------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nimantran_prod_frontend
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - nimantran_prod_net
+
+# ------------------------------------------------------------------------------
+# Persistent Storage Volumes
+# ------------------------------------------------------------------------------
+volumes:
+  postgres_prod_data:
+    driver: local
+  redis_prod_data:
+    driver: local
+  uploads_prod_data:
+    driver: local
+
+# ------------------------------------------------------------------------------
+# Isolated Internal Network
+# ------------------------------------------------------------------------------
+networks:
+  nimantran_prod_net:
+    driver: bridge

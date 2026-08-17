@@ -7,12 +7,12 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Nimantran AI"
     API_V1_STR: str = "/api/v1"
     APP_ENV: str = "development"
-    SECRET_KEY: str = "nimantran_super_secret_key_production_grade_32_chars_min!"
+    SECRET_KEY: str = "dev_secret_key_change_in_production_min_32_chars!"
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./nimantran.db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    JWT_SECRET: str = "nimantran_jwt_secret_key_change_in_production_9999"
+    JWT_SECRET: str = "dev_jwt_secret_key_change_in_production_9999"
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_EXPIRE_MINUTES: int = 43200  # 30 Days Token Lifetime
     JWT_REFRESH_EXPIRE_DAYS: int = 30
