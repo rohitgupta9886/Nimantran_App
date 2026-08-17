@@ -93,7 +93,7 @@ flowchart TD
         MetaWA["Meta WhatsApp Cloud API"]
         SMS["Twilio / Fast2SMS"]
         SMTP["SMTP Email Service"]
-        Gemini["Google Gemini 1.5 API"]
+        Gemini["Google Gemini 2.5 Flash API"]
     end
 
     Public --> Nginx
@@ -118,7 +118,7 @@ flowchart TD
 | :--- | :--- |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS, Lucide Icons, Canvas-Confetti, HTML5 QR Scanner |
 | **Backend** | FastAPI, Python 3.11+, SQLAlchemy 2.0 (Async), Pydantic v2, Uvicorn, Asyncio |
-| **AI & LLM** | LangGraph State Machine, LangChain, Google Gemini 1.5 Flash API |
+| **AI & LLM** | LangGraph State Machine, LangChain, Google Gemini 2.5 Flash API |
 | **Messaging** | Meta WhatsApp Cloud API (v21.0), Twilio REST API, Fast2SMS API, Python smtplib / aiosmtplib |
 | **Database** | SQLite with `aiosqlite` (Development) / PostgreSQL with `asyncpg` (Production) |
 | **Security** | Passlib (Bcrypt), PyJWT (HMAC-SHA256), CORS Middleware, Strict Input Sanitization |

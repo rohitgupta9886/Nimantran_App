@@ -12,8 +12,9 @@ class AIService:
 
     def __init__(self):
         api_key = settings.effective_gemini_key
+        model_name = settings.effective_ai_model
         if (settings.AI_PROVIDER.upper() == "GEMINI" or api_key) and api_key and api_key != "mock_key":
-            self.provider: AIProvider = GoogleGeminiAIProvider(api_key=api_key)
+            self.provider: AIProvider = GoogleGeminiAIProvider(api_key=api_key, model_name=model_name)
             self.provider_name = "GEMINI"
         else:
             self.provider: AIProvider = MockAIProvider()
@@ -302,28 +303,149 @@ class AIService:
         await db.commit()
         return stories
 
+    async def generate_structured_invitation(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        event_id: str,
+        event_type: str,
+        host_name: str,
+        venue: str,
+        date_str: str = "",
+        tone: str = "EMOTIONAL",
+        language: str = "HI_EN",
+        style: str = "Traditional Indian",
+        extra_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        credit_cost = 5
+        await CreditService.deduct_credits(
+            db, user_id, credit_cost, f"AI Structured Invitation ({event_type})", TransactionType.CONSUMPTION
+        )
+
+        result = await self.provider.generate_structured_invitation(
+            event_type=event_type,
+            host_name=host_name,
+            venue=venue,
+            date_str=date_str,
+            tone=tone,
+            language=language,
+            style=style,
+            extra_context=extra_context,
+        )
+
+        usage = AIUsage(
+            user_id=user_id,
+            event_id=event_id,
+            operation_type="STRUCTURED_INVITATION",
+            provider_name=self.provider_name,
+            credits_deducted=credit_cost,
+            status="SUCCESS",
+        )
+        db.add(usage)
+        await db.commit()
+        return result
+
+    async def improve_or_rewrite_invitation(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        event_id: str,
+        original_text: str,
+        instruction: str,
+        target_tone: Optional[str] = None,
+        target_language: Optional[str] = None,
+    ) -> Dict[str, str]:
+        credit_cost = 3
+        await CreditService.deduct_credits(
+            db, user_id, credit_cost, f"AI Invitation Polish / Rewrite", TransactionType.CONSUMPTION
+        )
+
+        result = await self.provider.improve_or_rewrite_invitation(
+            original_text=original_text,
+            instruction=instruction,
+            target_tone=target_tone,
+            target_language=target_language,
+        )
+
+        usage = AIUsage(
+            user_id=user_id,
+            event_id=event_id,
+            operation_type="INVITATION_REWRITE",
+            provider_name=self.provider_name,
+            credits_deducted=credit_cost,
+            status="SUCCESS",
+        )
+        db.add(usage)
+        await db.commit()
+        return result
+
+    async def chat_assistant(
+        self,
+        db: Optional[AsyncSession],
+        user_id: Optional[str],
+        messages: List[Dict[str, str]],
+        context: Optional[Dict[str, Any]] = None,
+        event_id: Optional[str] = None,
+    ) -> str:
+        credit_cost = 1
+        if db and user_id:
+            try:
+                await CreditService.deduct_credits(
+                    db, user_id, credit_cost, "Nimantran AI Chatbot Assistant", TransactionType.CONSUMPTION
+                )
+            except Exception:
+                pass
+
+        reply = await self.provider.chat_invitation_assistant(messages=messages, context=context)
+
+        if db and user_id:
+            try:
+                usage = AIUsage(
+                    user_id=user_id,
+                    event_id=event_id,
+                    operation_type="CHATBOT_ASSISTANT",
+                    provider_name=self.provider_name,
+                    credits_deducted=credit_cost,
+                    status="SUCCESS",
+                )
+                db.add(usage)
+                await db.commit()
+            except Exception:
+                pass
+
+        return reply
+
     async def generate_personalized_guest_invitation(
-        self, db: AsyncSession, user_id: str, event_id: str, guest_name: str, event_title: str, host_name: str, venue: str, date_str: str, invitation_link: str
+        self,
+        db: AsyncSession,
+        user_id: str,
+        event_id: str,
+        guest_name: str,
+        event_title: str,
+        host_name: str,
+        venue: str,
+        date_str: str,
+        invitation_link: str,
+        relationship: str = "",
+        tone: str = "WARM",
+        language: str = "HI_EN",
     ) -> str:
         credit_cost = 3
         await CreditService.deduct_credits(
             db, user_id, credit_cost, f"Personalized AI Invitation for {guest_name}", TransactionType.CONSUMPTION
         )
 
-        if isinstance(self.provider, GoogleGeminiAIProvider):
-            wording = await self.provider.generate_personalized_guest_invitation(
-                guest_name, event_title, host_name, venue, date_str, invitation_link
-            )
-        else:
-            wording = (
-                f"Dear {guest_name},\n\n"
-                f"Together with our families, {host_name} cordially invites you to celebrate '{event_title}'.\n\n"
-                f"📅 Date: {date_str}\n"
-                f"📍 Venue: {venue}\n\n"
-                f"✨ View full event details, story timeline & your personal entry pass:\n"
-                f"👉 {invitation_link}\n\n"
-                f"We look forward to celebrating together!"
-            )
+        wording = await self.provider.generate_personalized_guest_invitation(
+            guest_name=guest_name,
+            event_title=event_title,
+            host_name=host_name,
+            venue=venue,
+            date_str=date_str,
+            invitation_link=invitation_link,
+            relationship=relationship,
+            tone=tone,
+            language=language,
+        )
 
         usage = AIUsage(
             user_id=user_id,
@@ -333,6 +455,10 @@ class AIService:
             credits_deducted=credit_cost,
             status="SUCCESS",
         )
+        db.add(usage)
+        await db.commit()
+        return wording
+
     async def generate_bilingual_invitation_card(
         self, db: AsyncSession, user_id: str, event_id: str, guest_name: str, event_title: str, host_name: str, venue: str, date_str: str, invitation_link: str
     ) -> Dict[str, str]:

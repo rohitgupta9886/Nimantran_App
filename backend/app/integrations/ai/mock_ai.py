@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.integrations.ai.base import AIProvider
 
 
@@ -85,4 +85,98 @@ class MockAIProvider(AIProvider):
             "cover_image_url": bg_img,
             "family_blessing": "आशीर्वाद व स्नेहाकांक्षी: समस्त परिवार"
         }
+
+    async def generate_structured_invitation(
+        self,
+        event_type: str,
+        host_name: str,
+        venue: str,
+        date_str: str = "",
+        tone: str = "EMOTIONAL",
+        language: str = "HI_EN",
+        style: str = "Traditional Indian",
+        extra_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        lang_upper = (language or "HI_EN").upper()
+        if "HINGLISH" in lang_upper:
+            greeting = "Namaste! Warm Invitation"
+            intro = f"{host_name} family cordially invites you to celebrate with us!"
+            main_message = f"Aapki presence hamare {event_type} celebration ko aur bhi special bana degi. Please join us for an evening of joy and blessings!"
+            closing = "Warm regards, Host Family"
+        elif "HI" in lang_upper and "EN" not in lang_upper:
+            greeting = "|| श्री गणेशाय नमः ||\nसपरिवार सादर निमंत्रण"
+            intro = f"अत्यंत हर्ष के साथ {host_name} परिवार आपको आमंत्रित करता है।"
+            main_message = f"हमारे प्रिय {event_type} के मांगलिक अवसर पर आपकी गरिमामयी उपस्थिति हमारे आनंद को द्विगुणित करेगी।"
+            closing = "दर्शनाभिलाषी: समस्त परिवार"
+        else:
+            greeting = "Together with their families"
+            intro = f"{host_name} requests the honor of your gracious presence."
+            main_message = f"Please join us in celebrating the auspicious occasion of our {event_type}."
+            closing = "With Warmest Blessings & Regards"
+
+        details_str = f"Date: {date_str or 'To be announced'} | Venue: {venue or 'Venue details'}"
+
+        return {
+            "title": f"Auspicious {event_type.capitalize()} Celebration",
+            "greeting": greeting,
+            "intro": intro,
+            "main_message": main_message,
+            "event_details": details_str,
+            "host_message": f"Hosted with love by {host_name}",
+            "closing": closing,
+            "language": language,
+            "tone": tone,
+            "style": style,
+            "title_text": f"Auspicious {event_type.capitalize()} Celebration",
+            "message_text": f"{greeting}\n\n{intro}\n\n{main_message}\n\n📍 {details_str}\n\n{closing}",
+        }
+
+    async def improve_or_rewrite_invitation(
+        self,
+        original_text: str,
+        instruction: str,
+        target_tone: Optional[str] = None,
+        target_language: Optional[str] = None,
+    ) -> Dict[str, str]:
+        tone_str = target_tone or "Polished"
+        lang_str = target_language or "Selected Language"
+        rewritten = f"✨ [{tone_str} Style in {lang_str}]\n\n{original_text}\n\n(Enhanced with warmth and cultural elegance)"
+        return {
+            "improved_text": rewritten,
+            "tone": tone_str,
+            "language": lang_str,
+            "change_summary": f"Refined text to match {tone_str} tone and {lang_str} preference based on instruction: {instruction}",
+        }
+
+    async def chat_invitation_assistant(
+        self,
+        messages: list,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        last_msg = messages[-1].get("content", "") if messages else "Hello"
+        return f"Namaste! 🙏 Main Nimantran AI assistant hoon. Main aapke invitation ko aur bhi shandar banane mein madad kar sakta hoon. (Response to: '{last_msg}')"
+
+    async def generate_personalized_guest_invitation(
+        self,
+        guest_name: str,
+        event_title: str,
+        host_name: str,
+        venue: str,
+        date_str: str,
+        invitation_link: str,
+        relationship: str = "",
+        tone: str = "WARM",
+        language: str = "HI_EN",
+    ) -> str:
+        rel_honorific = f" ({relationship})" if relationship else ""
+        return (
+            f"Dear {guest_name}{rel_honorific},\n\n"
+            f"Together with our families, {host_name} cordially invites you to celebrate '{event_title}'.\n\n"
+            f"📅 Date: {date_str}\n"
+            f"📍 Venue: {venue}\n\n"
+            f"✨ View full event details & your personal digital entry pass:\n"
+            f"👉 {invitation_link}\n\n"
+            f"We look forward to welcoming you with warmest regards!"
+        )
+
 

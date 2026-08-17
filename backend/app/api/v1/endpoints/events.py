@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -280,6 +280,9 @@ async def delete_event(
 async def generate_ai_invitation(
     event_id: str,
     tone: str = "EMOTIONAL",
+    language: str = "HI_EN",
+    style: str = "Traditional Indian",
+    payload: Optional[dict] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -287,20 +290,87 @@ async def generate_ai_invitation(
     if not event or event.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
+    extra_ctx = payload.get("extra_context") if payload else None
+    req_tone = (payload.get("tone") if payload else None) or tone
+    req_lang = (payload.get("language") if payload else None) or language
+    req_style = (payload.get("style") if payload else None) or style
+
     try:
         evt_type = event.event_type.value if hasattr(event.event_type, 'value') else str(event.event_type)
-        wording = await ai_service.generate_invitation_text(
+        date_str = str(event.event_date) if event.event_date else ""
+        structured = await ai_service.generate_structured_invitation(
             db=db,
             user_id=current_user.id,
             event_id=event.id,
             event_type=evt_type,
             host_name=event.host_name,
             venue=event.venue_name,
-            tone=tone,
+            date_str=date_str,
+            tone=req_tone,
+            language=req_lang,
+            style=req_style,
+            extra_context=extra_ctx,
         )
-        return ResponseModel(data=wording, message="AI Invitation wording generated (5 credits deducted)")
+        return ResponseModel(data=structured, message="Structured AI Invitation wording generated (5 credits deducted)")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(e))
+
+
+@router.post("/{event_id}/ai/rewrite", response_model=ResponseModel[dict])
+async def rewrite_ai_invitation(
+    event_id: str,
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    event = await EventService.get_event_by_id(db, event_id)
+    if not event or event.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    original_text = payload.get("original_text", "")
+    instruction = payload.get("instruction", "Improve and polish the invitation text")
+    target_tone = payload.get("tone")
+    target_language = payload.get("language")
+
+    if not original_text:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="original_text is required")
+
+    try:
+        result = await ai_service.improve_or_rewrite_invitation(
+            db=db,
+            user_id=current_user.id,
+            event_id=event.id,
+            original_text=original_text,
+            instruction=instruction,
+            target_tone=target_tone,
+            target_language=target_language,
+        )
+        return ResponseModel(data=result, message="AI Invitation rewritten successfully (3 credits deducted)")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(e))
+
+
+@router.post("/ai/chatbot", response_model=ResponseModel[dict])
+async def ai_chatbot_assistant(
+    payload: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    messages = payload.get("messages", [])
+    context = payload.get("context", {})
+    event_id = payload.get("event_id")
+
+    if not messages:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="messages list is required")
+
+    reply = await ai_service.chat_assistant(
+        db=db,
+        user_id=current_user.id,
+        messages=messages,
+        context=context,
+        event_id=event_id,
+    )
+    return ResponseModel(data={"reply": reply}, message="AI Chatbot reply ready")
 
 
 @router.post("/{event_id}/memories", response_model=ResponseModel[dict])

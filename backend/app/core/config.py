@@ -57,9 +57,16 @@ class Settings(BaseSettings):
 
     # External Provider Defaults / Mode
     AI_PROVIDER: str = "MOCK"
+    AI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: Optional[str] = None
     AI_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+
+    @property
+    def effective_ai_model(self) -> str:
+        """Returns the configured Gemini/AI model, defaulting to gemini-2.5-flash."""
+        return self.AI_MODEL or self.GEMINI_MODEL or "gemini-2.5-flash"
 
     @property
     def effective_gemini_key(self) -> Optional[str]:

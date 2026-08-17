@@ -45,3 +45,55 @@ class AIProvider(ABC):
         """Generate structured AI invitation card design and wording on the fly."""
         pass
 
+    @abstractmethod
+    async def generate_structured_invitation(
+        self,
+        event_type: str,
+        host_name: str,
+        venue: str,
+        date_str: str = "",
+        tone: str = "EMOTIONAL",
+        language: str = "HI_EN",
+        style: str = "Traditional Indian",
+        extra_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Generate a complete structured invitation payload."""
+        pass
+
+    @abstractmethod
+    async def improve_or_rewrite_invitation(
+        self,
+        original_text: str,
+        instruction: str,
+        target_tone: Optional[str] = None,
+        target_language: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """Rewrite or improve invitation text according to specific tone or language instructions."""
+        pass
+
+    @abstractmethod
+    async def chat_invitation_assistant(
+        self,
+        messages: list,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Provide interactive conversational assistance for invitation creation and refinement."""
+        pass
+
+    @abstractmethod
+    async def generate_personalized_guest_invitation(
+        self,
+        guest_name: str,
+        event_title: str,
+        host_name: str,
+        venue: str,
+        date_str: str,
+        invitation_link: str,
+        relationship: str = "",
+        tone: str = "WARM",
+        language: str = "HI_EN",
+    ) -> str:
+        """Generate culturally tailored personal message for a guest."""
+        pass
+
+
