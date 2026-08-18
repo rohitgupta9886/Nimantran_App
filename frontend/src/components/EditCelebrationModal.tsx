@@ -4,6 +4,8 @@ import { X, Calendar, MapPin, User, Save, Sparkles, Building, ArrowLeft } from '
 import { apiFetch } from '../services/api';
 import { VisualCalendarPicker } from './VisualCalendarPicker';
 
+import { MASTER_THEME_CATALOG, getCelebrationThemeById } from '../utils/themeCatalog';
+
 interface EditCelebrationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -24,6 +26,7 @@ export const EditCelebrationModal: React.FC<EditCelebrationModalProps> = ({
   const [venueAddress, setVenueAddress] = useState('');
   const [startDate, setStartDate] = useState('');
   const [upiId, setUpiId] = useState('');
+  const [selectedThemeId, setSelectedThemeId] = useState('wedding-royal-marigold');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +38,7 @@ export const EditCelebrationModal: React.FC<EditCelebrationModalProps> = ({
       setVenueAddress(eventData.venue_address || '');
       setStartDate(eventData.start_date || '');
       setUpiId(eventData.upi_id || '');
+      setSelectedThemeId(eventData.theme_config?.theme || eventData.theme_config?.theme_id || 'wedding-royal-marigold');
     }
   }, [eventData]);
 
@@ -57,6 +61,11 @@ export const EditCelebrationModal: React.FC<EditCelebrationModalProps> = ({
           venue_address: venueAddress.trim(),
           start_date: updatedIsoDate,
           upi_id: upiId.trim(),
+          theme_config: {
+            ...(eventData.theme_config || {}),
+            theme: selectedThemeId,
+            theme_id: selectedThemeId,
+          },
         }),
       });
 
@@ -172,6 +181,21 @@ export const EditCelebrationModal: React.FC<EditCelebrationModalProps> = ({
               selectedDateTime={startDate}
               onChange={(val) => setStartDate(val)}
             />
+          </div>
+
+          <div>
+            <label className="block font-semibold text-[#9E6F6D] mb-1">Invitation Theme & Design</label>
+            <select
+              value={selectedThemeId}
+              onChange={(e) => setSelectedThemeId(e.target.value)}
+              className="w-full px-4 py-3 rounded-2xl bg-[#FAF7F3] border border-[#E9D3D0] text-[#302829] font-serif font-bold text-xs sm:text-sm focus:border-[#9E6F6D] outline-none cursor-pointer"
+            >
+              {MASTER_THEME_CATALOG.map((theme) => (
+                <option key={theme.id} value={theme.id}>
+                  {theme.icon} {theme.name} ({theme.celebrationType})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="pt-3 border-t border-[#E9D3D0] flex items-center justify-end gap-3">

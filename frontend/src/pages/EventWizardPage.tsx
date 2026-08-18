@@ -22,12 +22,15 @@ import {
   OccasionItem 
 } from '../utils/occasionCatalog';
 import { 
-  MASTER_CARD_DESIGNS, 
-  CARD_CATEGORY_FILTERS, 
-  getFilteredCardDesigns, 
-  getCardDesignById, 
-  CardDesignItem 
-} from '../utils/cardDesignCatalog';
+  MASTER_THEME_CATALOG,
+  THEME_FILTER_TAGS,
+  getFilteredCelebrationThemes,
+  getCelebrationThemeById,
+  getRecommendedThemeForOccasion,
+  CelebrationTheme
+} from '../utils/themeCatalog';
+import { ThemeArtworkCanvas } from '../components/ThemeArtworkCanvas';
+import { LiveInvitationPreviewModal } from '../components/LiveInvitationPreviewModal';
 
 // WIZARD STEP METADATA FOR NON-TECHNICAL GUIDANCE
 const WIZARD_STEPS = [
@@ -61,7 +64,9 @@ export const EventWizardPage: React.FC = () => {
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
 
   // DESIGN & PERSONALIZATION STATE
-  const [selectedThemeId, setSelectedThemeId] = useState('romantic-blush');
+  const [selectedThemeId, setSelectedThemeId] = useState('wedding-royal-marigold');
+  const [themeFilterTag, setThemeFilterTag] = useState<string>('ALL');
+  const [previewThemeModalItem, setPreviewThemeModalItem] = useState<CelebrationTheme | null>(null);
   const [hindiTitle, setHindiTitle] = useState('|| श्री गणेशाय नमः ||');
   const [invitationMessage, setInvitationMessage] = useState('Together with our families, we cordially invite you to celebrate our special day with us. Your presence and blessings will make our celebration complete.');
 
@@ -86,17 +91,18 @@ export const EventWizardPage: React.FC = () => {
     if (item.defaultMessage) {
       setInvitationMessage(item.defaultMessage);
     }
-    if (item.recommendedThemeIds && item.recommendedThemeIds.length > 0) {
-      setSelectedThemeId(item.recommendedThemeIds[0]);
+    const recTheme = getRecommendedThemeForOccasion(item.id);
+    if (recTheme) {
+      setSelectedThemeId(recTheme.id);
     }
     setStep(2);
   };
 
   const handleOccasionDropdownChange = (occId: string) => {
     setEventType(occId);
-    const occ = getOccasionById(occId);
-    if (occ && occ.recommendedThemeIds && occ.recommendedThemeIds.length > 0) {
-      setSelectedThemeId(occ.recommendedThemeIds[0]);
+    const recTheme = getRecommendedThemeForOccasion(occId);
+    if (recTheme) {
+      setSelectedThemeId(recTheme.id);
     }
   };
 
@@ -334,7 +340,7 @@ export const EventWizardPage: React.FC = () => {
     }
   };
 
-  const selectedThemeObj = getCardDesignById(selectedThemeId);
+  const selectedThemeObj = getCelebrationThemeById(selectedThemeId);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 text-[#302829] selection:bg-[#E9D3D0]">
@@ -709,18 +715,21 @@ export const EventWizardPage: React.FC = () => {
         </div>
       )}
 
-      {/* 🌟 STEP 3: CHOOSE YOUR INVITATION DESIGN & CARD PALETTE 🌟 */}
+      {/* 🌟 STEP 3: CHOOSE YOUR CELEBRATION DESIGN (IMAGE-FIRST & CELEBRATION-AWARE) 🌟 */}
       {step === 3 && (
         <div className="space-y-6 animate-in fade-in duration-300">
           {/* Header Bar with OCCASION SELECTOR DIRECTLY BESIDE PALETTE */}
           <div className="p-6 sm:p-8 rounded-3xl bg-[#FFFDFC] border border-[#E9D3D0] shadow-sm space-y-5">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F2E5E2] border border-[#D8B5B0] text-[#9E6F6D] text-[11px] font-mono font-extrabold uppercase mb-2">
+                  <Sparkles className="w-3.5 h-3.5 text-[#C9AA78]" /> Step 3 of 7 • Celebration Identity
+                </div>
                 <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#302829]">
-                  Choose Your Invitation Design
+                  Choose Your Celebration Design
                 </h2>
-                <p className="text-xs text-[#8C7E80] mt-1">
-                  Designs are intelligently prioritized for your occasion. Change occasion anytime without going back!
+                <p className="text-xs text-[#8C7E80] mt-1 max-w-xl">
+                  Pick a design that captures the feeling of your celebration. You can customize every detail later.
                 </p>
               </div>
 
@@ -743,115 +752,165 @@ export const EventWizardPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Card Category Style Filter Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
-              {CARD_CATEGORY_FILTERS.map((cat) => (
+            {/* Filter Tags */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full custom-scrollbar">
+              {THEME_FILTER_TAGS.map((tag) => (
                 <button
-                  key={cat.id}
+                  key={tag.id}
                   type="button"
-                  onClick={() => setCardCategoryFilter(cat.id)}
+                  onClick={() => setThemeFilterTag(tag.id)}
                   className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                    cardCategoryFilter === cat.id
+                    themeFilterTag === tag.id
                       ? 'bg-[#9E6F6D] text-white shadow-md'
                       : 'bg-[#FAF7F3] text-[#8C7E80] hover:bg-[#F2E5E2] hover:text-[#302829] border border-[#E9D3D0]'
                   }`}
                 >
-                  <span>{cat.icon}</span>
-                  <span>{cat.label}</span>
+                  <span>{tag.icon}</span>
+                  <span>{tag.label}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Expanded Card Designs Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {getFilteredCardDesigns(cardCategoryFilter, eventType).map((card) => {
-              const isSelected = selectedThemeId === card.themeId || selectedThemeId === card.id;
-              const isOccasionMatch = card.recommendedOccasions.includes((eventType || '').toUpperCase());
+          {/* Image-First Celebration Design Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
+            {getFilteredCelebrationThemes(themeFilterTag, eventType).map((themeItem) => {
+              const isSelected = selectedThemeId === themeItem.id;
+              const isOccasionMatch =
+                themeItem.recommendedOccasions.includes((eventType || '').toUpperCase()) ||
+                themeItem.celebrationType === (eventType || '').toUpperCase();
 
               return (
                 <div
-                  key={card.id}
-                  onClick={() => {
-                    setSelectedThemeId(card.themeId);
-                    setStep(4);
-                  }}
-                  className={`p-6 rounded-3xl border-2 cursor-pointer transition-all duration-300 relative overflow-hidden flex flex-col justify-between space-y-4 hover:scale-[1.02] hover:shadow-2xl ${
+                  key={themeItem.id}
+                  onClick={() => setSelectedThemeId(themeItem.id)}
+                  className={`group rounded-3xl border-2 cursor-pointer transition-all duration-300 relative overflow-hidden flex flex-col justify-between p-5 space-y-4 hover:scale-[1.02] hover:shadow-2xl ${
                     isSelected
                       ? 'border-[#FFD700] ring-4 ring-[#9E6F6D]/30 shadow-2xl bg-slate-900 text-white'
                       : 'border-[#E9D3D0] bg-[#FFFDFC] text-[#302829] hover:border-[#9E6F6D]'
                   }`}
                 >
-                  {/* Top Metadata Header */}
+                  {/* Top Metadata Header: Badge & Status */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-mono font-extrabold uppercase tracking-widest text-[#9E6F6D] flex items-center gap-1">
-                      <span>{card.badgeIcon}</span>
-                      <span>{card.categoryLabel}</span>
+                    <span
+                      className="px-3 py-1 rounded-full text-[10px] font-mono font-extrabold uppercase tracking-widest flex items-center gap-1 border"
+                      style={{
+                        backgroundColor: isSelected ? 'rgba(255,215,0,0.15)' : themeItem.colorPalette.badgeBg,
+                        color: isSelected ? '#FFD700' : themeItem.colorPalette.badgeText,
+                        borderColor: isSelected ? 'rgba(255,215,0,0.4)' : themeItem.colorPalette.borderSoft,
+                      }}
+                    >
+                      <span>{themeItem.badgeIcon}</span>
+                      <span>{themeItem.badgeLabel}</span>
                     </span>
 
                     {isSelected ? (
-                      <span className="px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-extrabold flex items-center gap-1 shadow-md">
+                      <span className="px-3 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-extrabold flex items-center gap-1 shadow-md animate-in zoom-in-90">
                         <Check className="w-3 h-3" /> Selected
                       </span>
                     ) : isOccasionMatch ? (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold">
-                        ✨ Best Match
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-extrabold flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-600" /> Best Match
                       </span>
                     ) : null}
                   </div>
 
-                  {/* Visual Card Artwork Preview Box */}
-                  <div
-                    style={{ background: card.bgGradient }}
-                    className={`p-6 rounded-2xl ${card.borderStyle} text-center space-y-3 relative overflow-hidden`}
-                  >
-                    {/* Sacred Shloka or Occasion Header */}
-                    <span className="text-amber-300 text-xs font-serif block tracking-wider drop-shadow">
-                      {hindiTitle || '|| श्री गणेशाय नमः ||'}
-                    </span>
+                  {/* 1. Large 65-75% Visual Card Artwork Preview */}
+                  <div className="h-56 sm:h-64 w-full rounded-2xl overflow-hidden shadow-inner relative group-hover:brightness-105 transition-all">
+                    <ThemeArtworkCanvas
+                      theme={themeItem}
+                      title={title || 'Rohit & Priya'}
+                      hindiTitle={hindiTitle}
+                      dateStr={
+                        startDate
+                          ? new Date(startDate).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '18 Dec 2026'
+                      }
+                      venueName={venueName || 'The Taj Palace'}
+                      className="h-full"
+                    />
 
-                    {/* Celebrant / Couple Title */}
-                    <h4 className={`text-xl font-extrabold text-white drop-shadow-lg ${card.fontFamily}`}>
-                      {title || 'Rohit & Priya'}
-                    </h4>
-
-                    {/* Date Pill */}
-                    <div className="inline-block py-1 px-3 rounded-full bg-black/40 border border-amber-300/40 text-[11px] font-mono text-amber-200 backdrop-blur-sm">
-                      🗓️ {startDate ? new Date(startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '18 Dec 2026'}
+                    {/* Quick Preview Hover Overlay Action */}
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewThemeModalItem(themeItem);
+                        }}
+                        className="px-5 py-2.5 rounded-full bg-white/95 text-slate-900 font-serif font-extrabold text-xs flex items-center gap-1.5 shadow-xl hover:scale-105 active:scale-95 transition-all"
+                      >
+                        <Eye className="w-4 h-4 text-[#9E6F6D]" />
+                        <span>Live Preview</span>
+                      </button>
                     </div>
-
-                    {/* Venue */}
-                    <p className="text-[10px] font-mono text-slate-300 truncate drop-shadow">
-                      📍 {venueName || 'The Taj Palace'}
-                    </p>
                   </div>
 
-                  {/* Design Name & Description */}
-                  <div className="space-y-1">
-                    <h3 className="font-serif text-base font-bold">
-                      {card.name}
+                  {/* 2. Design Name & Concise Description */}
+                  <div className="space-y-1 text-left">
+                    <h3 className="font-serif text-lg font-bold truncate">
+                      {themeItem.name}
                     </h3>
-                    <p className="text-xs opacity-75 line-clamp-2">
-                      {card.description}
+                    <p className={`text-xs line-clamp-2 leading-relaxed ${isSelected ? 'text-slate-300' : 'text-[#8C7E80]'}`}>
+                      {themeItem.description}
                     </p>
                   </div>
 
-                  {/* 1-Tap Select Action Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedThemeId(card.themeId);
-                      setStep(4);
-                    }}
-                    className={`w-full py-3 rounded-2xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-[#FFD700] text-black shadow-xl ring-2 ring-amber-400'
-                        : 'bg-[#9E6F6D] text-white hover:bg-[#875B59]'
-                    }`}
-                  >
-                    {isSelected ? '✓ SELECTED DESIGN' : 'USE THIS DESIGN →'}
-                  </button>
+                  {/* 3. Theme Tags / Metadata */}
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {themeItem.tags.map((t, idx) => (
+                      <span
+                        key={idx}
+                        className={`text-[9px] font-mono px-2 py-0.5 rounded-md border ${
+                          isSelected
+                            ? 'bg-black/50 text-amber-300 border-amber-400/30'
+                            : 'bg-[#FAF7F3] text-slate-600 border-[#E9D3D0]'
+                        }`}
+                      >
+                        #{t}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* 4. Action Buttons (Select + Preview) */}
+                  <div className="grid grid-cols-3 gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewThemeModalItem(themeItem);
+                      }}
+                      className={`py-2.5 px-2 rounded-2xl font-bold text-xs border transition-all flex items-center justify-center gap-1 ${
+                        isSelected
+                          ? 'bg-black/60 text-amber-200 border-amber-400/40 hover:bg-black'
+                          : 'bg-[#FAF7F3] text-slate-700 border-[#E9D3D0] hover:bg-[#F2E5E2]'
+                      }`}
+                      title="Inspect full live invitation"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Preview</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedThemeId(themeItem.id);
+                        setStep(4);
+                      }}
+                      className={`col-span-2 py-2.5 px-4 rounded-2xl font-serif font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 ${
+                        isSelected
+                          ? 'bg-[#FFD700] text-black shadow-xl ring-2 ring-amber-400'
+                          : 'bg-[#9E6F6D] text-white hover:bg-[#875B59]'
+                      }`}
+                    >
+                      {isSelected ? '✓ SELECTED' : 'USE THIS DESIGN →'}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -876,6 +935,27 @@ export const EventWizardPage: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {/* 🌟 LIVE INVITATION PREVIEW MODAL IN STEP 3 🌟 */}
+      {previewThemeModalItem && (
+        <LiveInvitationPreviewModal
+          isOpen={Boolean(previewThemeModalItem)}
+          onClose={() => setPreviewThemeModalItem(null)}
+          theme={previewThemeModalItem}
+          title={title || 'Priyanka & Rohit'}
+          hindiTitle={hindiTitle}
+          invitationMessage={invitationMessage}
+          startDate={startDate}
+          venueName={venueName}
+          venueAddress={venueAddress}
+          hostName={hostName}
+          onSelectTheme={(tId) => {
+            setSelectedThemeId(tId);
+            setStep(4);
+          }}
+          isSelected={selectedThemeId === previewThemeModalItem.id}
+        />
       )}
 
       {/* 🌟 STEP 4: PERSONALIZE YOUR INVITATION 🌟 */}
@@ -1214,8 +1294,12 @@ export const EventWizardPage: React.FC = () => {
 
           {/* 3D Invitation Preview Stage Box */}
           <div
-            style={{ background: selectedThemeObj.bgGradient }}
-            className={`mx-auto p-6 sm:p-10 rounded-[36px] ${selectedThemeObj.borderStyle || 'border-2 border-amber-300'} text-white text-center space-y-4 shadow-2xl transition-all ${
+            style={{
+              backgroundColor: selectedThemeObj.colorPalette.canvasBg,
+              borderColor: selectedThemeObj.colorPalette.borderAccent,
+              boxShadow: `0 25px 60px -15px ${selectedThemeObj.colorPalette.primary}80`,
+            }}
+            className={`mx-auto p-6 sm:p-10 rounded-[36px] border-2 text-white text-center space-y-4 shadow-2xl transition-all ${
               previewDevice === 'MOBILE' ? 'max-w-sm' : 'max-w-3xl'
             }`}
           >

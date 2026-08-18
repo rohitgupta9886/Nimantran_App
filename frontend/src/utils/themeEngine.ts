@@ -532,9 +532,23 @@ export const CELEBRATION_THEMES: Record<string, ThemeTokens> = {
   },
 };
 
+import { getCelebrationThemeById } from './themeCatalog';
+
 export const getThemeTokens = (themeKey?: string): ThemeTokens => {
   if (themeKey && CELEBRATION_THEMES[themeKey]) {
     return CELEBRATION_THEMES[themeKey];
+  }
+  if (themeKey) {
+    const catalogTheme = getCelebrationThemeById(themeKey);
+    if (catalogTheme) {
+      return {
+        id: catalogTheme.id,
+        name: catalogTheme.name,
+        category: catalogTheme.tagline,
+        categoryTag: catalogTheme.celebrationType as any,
+        ...catalogTheme.colorPalette,
+      };
+    }
   }
   return CELEBRATION_THEMES['romantic-blush'];
 };

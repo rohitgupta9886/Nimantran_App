@@ -7,10 +7,6 @@ import {
   Heart,
   Sparkles,
   Send,
-  CheckCircle2,
-  Clock,
-  MessageSquare,
-  X,
   Download,
   Check,
   Volume2,
@@ -21,6 +17,7 @@ import {
   ShieldCheck,
   Compass,
   Copy,
+  X,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import confetti from 'canvas-confetti';
@@ -28,6 +25,7 @@ import { apiFetch } from '../services/api';
 import { PublicInvitationHero } from '../components/PublicInvitationHero';
 import { WebGLShaderBackground } from '../components/WebGLShaderBackground';
 import { getThemeTokens } from '../utils/themeEngine';
+import { getCelebrationConfig } from '../utils/celebrationEngine';
 import { downloadIcsCalendarFile } from '../utils/calendarExport';
 
 // Lazy-load below-the-fold modal and story components
@@ -145,10 +143,11 @@ export const PublicEventPage: React.FC = () => {
           if (res && res.data) {
             setData({
               event: res.data.event,
+              canonical_invitation: res.data.canonical_invitation,
               wishes: res.data.wishes || [],
               memories: res.data.memories || [],
-              headline: `You're Graciously Invited`,
-              lifecycle_phase: 'BEFORE',
+              headline: res.data.headline || `You're Graciously Invited`,
+              lifecycle_phase: res.data.lifecycle_phase || 'BEFORE',
             });
             setGuestPersonalization({
               guest_name: res.data.guest_name,
@@ -218,7 +217,7 @@ export const PublicEventPage: React.FC = () => {
         ? `/public/invitations/t/${token}/rsvp`
         : `/public/events/${slug}/rsvp`;
 
-      const res = await apiFetch<any>(endpoint, {
+      await apiFetch<any>(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           guest_name: guestPersonalization?.guest_name || 'Valued Guest',
@@ -256,7 +255,7 @@ export const PublicEventPage: React.FC = () => {
         ? `/public/invitations/t/${token}/wishes`
         : `/public/events/${slug}/wishes`;
 
-      const res = await apiFetch<any>(endpoint, {
+      await apiFetch<any>(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           sender_name: wishName.trim() || 'Well Wisher',
@@ -299,21 +298,29 @@ export const PublicEventPage: React.FC = () => {
   }
 
   const evt = data?.event || {
-    title: 'Wedding Celebration',
-    event_type: 'WEDDING',
-    host_name: 'Gupta & Sharma Families',
-    start_date: '2026-12-18T18:30:00',
-    venue_name: 'The Taj Convention Centre',
-    venue_address: 'Vipul Khand, Gomti Nagar, Lucknow',
-    hindi_title: '|| श्री गणेशाय नमः ||',
-    invitation_message:
-      'Together with our families, we cordially invite you to celebrate our special day with us.',
+    title: 'Celebration Gathering',
+    event_type: 'CELEBRATION',
+    host_name: 'Host Family',
+    start_date: new Date().toISOString(),
+    venue_name: 'Celebration Venue',
+    venue_address: 'Venue Location',
+    invitation_message: 'Cordially invite you to celebrate our special day with us.',
   };
+
+  const canonical = data?.canonical_invitation || {};
+  const celebrantOrCouple =
+    evt.couple_names ||
+    (evt.bride_name && evt.groom_name ? `${evt.groom_name} & ${evt.bride_name}` : undefined) ||
+    evt.celebrant_name ||
+    canonical.celebrant_name ||
+    evt.title;
+
+  const cfg = getCelebrationConfig(evt.event_type, evt.host_name || '', celebrantOrCouple);
 
   const themeId = guestPersonalization?.theme_id || evt.theme_config?.theme || 'romantic-blush';
   const theme = getThemeTokens(themeId);
   const memoriesList = data?.memories || evt.theme_config?.memories || [];
-  const functionsList = evt.functions || [];
+  const functionsList = evt.functions || canonical.functions || [];
 
   const formattedDate = formatDateSafe(evt.start_date, {
     weekday: 'long',
@@ -332,11 +339,11 @@ export const PublicEventPage: React.FC = () => {
   const mapsUrl = evt.google_maps_url || `https://maps.google.com/?q=${encodeURIComponent(fullVenue)}`;
 
   const handleGoogleCalendar = () => {
-    const eventDateObj = evt.start_date ? new Date(evt.start_date) : new Date('2026-12-18T18:30:00');
-    const validDate = isNaN(eventDateObj.getTime()) ? new Date('2026-12-18T18:30:00') : eventDateObj;
+    const eventDateObj = evt.start_date ? new Date(evt.start_date) : new Date();
+    const validDate = isNaN(eventDateObj.getTime()) ? new Date() : eventDateObj;
     const start = validDate.toISOString().replace(/-|:|\.\d\d\d/g, '');
     const end = new Date(validDate.getTime() + 4 * 3600 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, '');
-    const details = evt.invitation_message || `You are graciously invited to celebrate ${evt.title}!`;
+    const details = evt.invitation_message || canonical.message || `You are graciously invited to celebrate ${evt.title}!`;
     const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
       evt.title || 'Celebration'
     )}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(fullVenue)}&dates=${start}/${end}`;
@@ -347,10 +354,10 @@ export const PublicEventPage: React.FC = () => {
     const validDateStr =
       evt.start_date && !isNaN(new Date(evt.start_date).getTime())
         ? evt.start_date
-        : new Date('2026-12-18T18:30:00').toISOString();
+        : new Date().toISOString();
     downloadIcsCalendarFile({
       title: evt.title || 'Grand Celebration',
-      description: evt.invitation_message || `You are graciously invited to celebrate ${evt.title}!`,
+      description: evt.invitation_message || canonical.message || `You are graciously invited to celebrate ${evt.title}!`,
       venue_name: fullVenue,
       start_date: validDateStr,
     });
@@ -358,8 +365,39 @@ export const PublicEventPage: React.FC = () => {
 
   const musicTrackUrl =
     guestPersonalization?.music_url ||
-    evt.theme_config?.music_url ||
-    'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3';
+    evt.background_music_url ||
+    evt.theme_config?.music_url;
+
+  // Preset blessing chips based on celebration category
+  const blessingPresets =
+    cfg.category === 'BIRTHDAY'
+      ? [
+          '🎉 Wishing you a very Happy Birthday!',
+          '🎂 May all your dreams come true this year!',
+          '🌟 Have a fantastic celebration and blessed year ahead!',
+          '🥳 Excited to party and celebrate with you!',
+        ]
+      : cfg.category === 'BABY_SACRED' || cfg.category === 'DEVOTIONAL'
+      ? [
+          '🙏 May God shower eternal health and happiness upon the child!',
+          '🌸 Heartiest congratulations on this auspicious milestone!',
+          '✨ Wishing the little one a bright and blessed future!',
+          '💐 With warm love and heartfelt blessings from all of us!',
+        ]
+      : cfg.category === 'CORPORATE'
+      ? [
+          '🤝 Congratulations on achieving this milestone!',
+          '🌟 Looking forward to an inspiring session and celebration!',
+          '💼 Best wishes for continued success and growth!',
+        ]
+      : [
+          '💐 Heartiest Congratulations & Best Wishes!',
+          '✨ Wishing you a lifetime of love and happiness!',
+          '🙏 May God shower eternal blessings upon you both!',
+          '🎉 Excited to celebrate this special day with you!',
+        ];
+
+  const hasShagun = Boolean(evt.accepts_digital_shagun || evt.upi_id || evt.host_upi_mobile || evt.upi_qr_url);
 
   return (
     <div
@@ -369,8 +407,8 @@ export const PublicEventPage: React.FC = () => {
       {/* Background Celebration Audio Element */}
       {musicTrackUrl && <audio ref={audioRef} src={musicTrackUrl} loop preload="auto" />}
 
-      {/* 0. INTERACTIVE ATMOSPHERIC CANVAS BACKGROUND */}
-      <WebGLShaderBackground theme={theme} />
+      {/* 0. DYNAMIC ATMOSPHERIC CANVAS BACKGROUND */}
+      <WebGLShaderBackground theme={theme} eventType={evt.event_type} />
 
       {/* 🌟 1. HERO SECTION (100svh) 🌟 */}
       <PublicInvitationHero
@@ -381,14 +419,15 @@ export const PublicEventPage: React.FC = () => {
           evt.couple_names ||
           (evt.bride_name && evt.groom_name ? `${evt.groom_name} & ${evt.bride_name}` : undefined)
         }
-        invitationMessage={evt.invitation_message}
+        celebrantName={evt.celebrant_name || canonical.celebrant_name}
+        invitationMessage={evt.invitation_message || canonical.message || evt.description}
         eventType={evt.event_type}
         startDate={evt.start_date}
         venueName={evt.venue_name}
         venueAddress={evt.venue_address}
         googleMapsUrl={evt.google_maps_url}
         hostName={evt.host_name}
-        salutation={guestPersonalization?.salutation}
+        salutation={guestPersonalization?.salutation || canonical.greeting}
         guestName={guestPersonalization?.guest_name}
         passCode={guestPersonalization?.pass_code || 'NIM-ENTRY-1001'}
         musicUrl={musicTrackUrl}
@@ -476,7 +515,7 @@ export const PublicEventPage: React.FC = () => {
                   CELEBRATION VENUE
                 </span>
                 <h3 className="font-serif text-lg font-bold text-white">
-                  {evt.venue_name || 'Grand Banquet Hall'}
+                  {evt.venue_name || 'Celebration Venue'}
                 </h3>
                 {evt.venue_address && (
                   <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">{evt.venue_address}</p>
@@ -520,49 +559,54 @@ export const PublicEventPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Featured Digital Shagun Button */}
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={() => setIsShagunModalOpen(true)}
-              className="w-full py-4 px-6 rounded-3xl font-serif font-extrabold text-xs sm:text-sm tracking-wider uppercase text-amber-100 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] border-2 border-amber-300/80 shadow-[0_12px_30px_-5px_rgba(200,155,90,0.35)] overflow-hidden"
-              style={{
-                background: 'linear-gradient(135deg, #6E2035 0%, #521626 50%, #3A1420 100%)',
-              }}
-            >
-              <Gift className="w-5 h-5 text-amber-300 animate-bounce" />
-              <span className="drop-shadow-md tracking-widest text-amber-200">
-                🎁 BLESSINGS & DIGITAL SHAGUN (UPI)
-              </span>
-              <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
-            </button>
-          </div>
+          {/* Featured Digital Shagun Button (Shown conditionally when configured) */}
+          {hasShagun && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setIsShagunModalOpen(true)}
+                className="w-full py-4 px-6 rounded-3xl font-serif font-extrabold text-xs sm:text-sm tracking-wider uppercase text-amber-100 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] border-2 border-amber-300/80 shadow-[0_12px_30px_-5px_rgba(200,155,90,0.35)] overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, #6E2035 0%, #521626 50%, #3A1420 100%)',
+                }}
+              >
+                <Gift className="w-5 h-5 text-amber-300 animate-bounce" />
+                <span className="drop-shadow-md tracking-widest text-amber-200">
+                  {cfg.shagunButtonText}
+                </span>
+                <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
+              </button>
+            </div>
+          )}
         </section>
 
-        {/* 🌟 3. FORMAL INVITATION BLESSINGS 🌟 */}
-        <section
-          id="invitation-message-section"
-          className="p-6 sm:p-8 rounded-3xl border-2 border-amber-300/60 bg-gradient-to-b from-[#2A0A14]/90 to-[#1A040C]/90 backdrop-blur-xl text-center space-y-4 shadow-xl"
-        >
-          <div className="text-amber-300 font-serif font-bold text-base">|| श्री गणेशाय नमः ||</div>
-          <div className="text-amber-200 font-serif text-sm font-semibold">सपरिवार सादर निमंत्रण</div>
+        {/* 🌟 3. FORMAL INVITATION MESSAGE & BLESSINGS 🌟 */}
+        {(evt.invitation_message || canonical.message || evt.description) && (
+          <section
+            id="invitation-message-section"
+            className="p-6 sm:p-8 rounded-3xl border-2 border-amber-300/60 bg-gradient-to-b from-[#2A0A14]/90 to-[#1A040C]/90 backdrop-blur-xl text-center space-y-4 shadow-xl"
+          >
+            {evt.hindi_title && (
+              <div className="text-amber-300 font-serif font-bold text-base">{evt.hindi_title}</div>
+            )}
+            
+            {canonical.greeting && (
+              <div className="text-amber-200 font-serif text-sm font-semibold">{canonical.greeting}</div>
+            )}
 
-          <p className="text-sm sm:text-base font-serif italic text-white leading-relaxed max-w-xl mx-auto">
-            "मान्यवर, {evt.host_name || 'परिवार'} की ओर से '{evt.title}' के शुभ अवसर पर आपकी गरिमामयी उपस्थिति अत्यंत प्रार्थनीय है।"
-          </p>
+            <p className="text-sm sm:text-base font-serif italic text-white leading-relaxed max-w-xl mx-auto">
+              "{evt.invitation_message || canonical.message || evt.description}"
+            </p>
 
-          <div className="w-24 h-px bg-amber-400/40 mx-auto my-2" />
+            <div className="w-24 h-px bg-amber-400/40 mx-auto my-2" />
 
-          <p className="text-xs text-slate-300 font-serif italic leading-relaxed max-w-lg mx-auto">
-            "Together with our families, we cordially request the honor of your presence and warm blessings as we celebrate this joyous milestone."
-          </p>
+            <div className="text-xs text-amber-300 font-serif italic pt-1">
+              {canonical.blessing || `विनीतः: ${evt.host_name || 'समस्त परिवार'}`}
+            </div>
+          </section>
+        )}
 
-          <div className="text-xs text-amber-300 font-serif italic pt-2">
-            विनीतः एवं दर्शनाभिलाषी: समस्त परिवार
-          </div>
-        </section>
-
-        {/* 🌟 4. STORY TIMELINE 🌟 */}
+        {/* 🌟 4. STORY TIMELINE (WHEN MEMORIES EXIST) 🌟 */}
         {memoriesList.length > 0 && (
           <section id="story-timeline-section" className="space-y-6">
             <div className="text-center space-y-1">
@@ -591,7 +635,7 @@ export const PublicEventPage: React.FC = () => {
           <div className="text-center space-y-1">
             <span className="text-[10px] font-mono uppercase tracking-[0.25em] font-extrabold text-amber-300 flex items-center justify-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>WILL YOU CELEBRATE WITH US?</span>
+              <span>{cfg.rsvpQuestion.toUpperCase()}</span>
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             </span>
             <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-white drop-shadow-md">
@@ -626,7 +670,7 @@ export const PublicEventPage: React.FC = () => {
                     className="py-4 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 border border-emerald-400 active:scale-95 transition-all"
                   >
                     <Heart className="w-4 h-4 fill-white" />
-                    <span>❤️ YES, I'LL BE THERE</span>
+                    <span>{cfg.rsvpYesCta}</span>
                   </button>
 
                   <button
@@ -635,7 +679,7 @@ export const PublicEventPage: React.FC = () => {
                     disabled={quickRsvpSubmitting}
                     className="py-4 px-4 rounded-2xl bg-black/60 hover:bg-black/80 text-amber-200 font-bold text-xs shadow-md flex items-center justify-center gap-2 border border-amber-400/40 active:scale-95 transition-all"
                   >
-                    <span>🤍 MAYBE</span>
+                    <span>{cfg.rsvpMaybeCta}</span>
                   </button>
 
                   <button
@@ -644,7 +688,7 @@ export const PublicEventPage: React.FC = () => {
                     disabled={quickRsvpSubmitting}
                     className="py-4 px-4 rounded-2xl bg-black/40 hover:bg-black/60 text-slate-400 font-bold text-xs shadow-sm flex items-center justify-center gap-2 border border-slate-700 active:scale-95 transition-all"
                   >
-                    <span>SORRY, CAN'T MAKE IT</span>
+                    <span>{cfg.rsvpNoCta}</span>
                   </button>
                 </div>
 
@@ -654,7 +698,7 @@ export const PublicEventPage: React.FC = () => {
                     onClick={() => setIsRsvpModalOpen(true)}
                     className="text-xs font-mono text-amber-300 underline hover:text-amber-200"
                   >
-                    Need to add meal preferences or additional guests? Open Full RSVP Form →
+                    Need to add dietary preferences or plus-ones? Open Full RSVP Form →
                   </button>
                 </div>
               </div>
@@ -665,7 +709,7 @@ export const PublicEventPage: React.FC = () => {
                   <span>✓ Attendance Confirmed!</span>
                 </div>
                 <p className="text-xs font-serif italic text-emerald-200">
-                  "We are overjoyed that you are joining us to celebrate!"
+                  "Your presence means the world to us. We look forward to celebrating together!"
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                   <button
@@ -692,12 +736,12 @@ export const PublicEventPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-amber-400/30 pb-3">
               <div>
                 <span className="text-[10px] font-mono uppercase tracking-[0.2em] font-extrabold text-amber-300 block">
-                  ✦ WALL OF LOVE ✦
+                  ✦ CELEBRATION WISHES ✦
                 </span>
                 <h3 className="font-serif text-xl font-extrabold text-white">Send Your Warm Blessings</h3>
               </div>
               <div className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-mono font-bold">
-                {wishesList.length} Blessings
+                {wishesList.length} Wishes
               </div>
             </div>
 
@@ -736,15 +780,10 @@ export const PublicEventPage: React.FC = () => {
               {/* 1-Tap Quick Blessing Preset Chips */}
               <div className="space-y-1.5 pt-0.5 text-left">
                 <span className="text-[10px] font-mono text-amber-300/80 font-bold uppercase tracking-wider block">
-                  ⚡ 1-Tap Quick Blessing:
+                  ⚡ 1-Tap Quick Wishes:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {[
-                    '💐 Heartiest Congratulations & Best Wishes!',
-                    '✨ Wishing you a lifetime of love and happiness!',
-                    '🙏 May God shower eternal blessings upon you both!',
-                    '🎉 Excited to celebrate this special day with you!',
-                  ].map((preset, idx) => (
+                  {blessingPresets.map((preset, idx) => (
                     <button
                       key={idx}
                       type="button"
@@ -802,7 +841,7 @@ export const PublicEventPage: React.FC = () => {
               {guestPersonalization?.guest_name || 'Valued Guest'}
             </h3>
             <p className="text-xs font-mono text-slate-400">
-              Present this QR Code or Passcode at the venue reception gate.
+              Present this QR Code or Passcode at the reception entrance.
             </p>
           </div>
 
@@ -885,9 +924,9 @@ export const PublicEventPage: React.FC = () => {
                     ✨
                   </div>
                   <div className="space-y-1 flex-1">
-                    <div className="font-serif font-extrabold text-sm text-white">{fn.name}</div>
+                    <div className="font-serif font-extrabold text-sm text-white">{fn.name || fn.title}</div>
                     <div className="text-xs font-mono text-amber-300 font-bold">
-                      ⏰ {fn.date_time || 'Scheduled Time'}
+                      ⏰ {fn.date_time || fn.start_time || 'Scheduled Time'}
                     </div>
                     {fn.venue_name && <div className="text-xs text-slate-300 font-mono">📍 {fn.venue_name}</div>}
                     {fn.description && (
@@ -900,13 +939,10 @@ export const PublicEventPage: React.FC = () => {
           </section>
         )}
 
-        {/* 🌟 8. EMOTIONAL CLOSING FRAME 🌟 */}
+        {/* 🌟 8. DYNAMIC CLOSING SIGNATURE FRAME 🌟 */}
         <footer className="text-center py-12 space-y-3 border-t border-amber-400/30">
-          <div className="text-amber-300 font-serif text-lg sm:text-xl font-bold">
-            With Joyful Hearts & Love,
-          </div>
           <h3 className="font-serif text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#FFF5DC] via-[#FFD700] to-[#E5C07B]">
-            {evt.couple_names || evt.title}
+            {cfg.closingSalutation}
           </h3>
           <p className="text-xs font-serif italic text-amber-100/80 max-w-sm mx-auto">
             "Thank you for being an indispensable part of our lives and celebration."
@@ -930,7 +966,7 @@ export const PublicEventPage: React.FC = () => {
               }}
             >
               <Heart className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
-              <span>{isConfirmedState ? '✓ RSVP CONFIRMED' : '❤️ RSVP NOW'}</span>
+              <span>{isConfirmedState ? '✓ RSVP CONFIRMED' : 'RSVP NOW'}</span>
             </button>
 
             <a
@@ -944,15 +980,17 @@ export const PublicEventPage: React.FC = () => {
               <span>Map</span>
             </a>
 
-            <button
-              type="button"
-              onClick={() => setIsShagunModalOpen(true)}
-              className="py-3 px-3.5 rounded-full bg-[#4A1220] border border-amber-400/40 text-amber-200 text-xs font-bold flex items-center gap-1 shadow-md active:scale-95 transition-all shrink-0"
-              title="Send Digital Shagun via UPI"
-            >
-              <Gift className="w-3.5 h-3.5 text-amber-300" />
-              <span>Shagun</span>
-            </button>
+            {hasShagun && (
+              <button
+                type="button"
+                onClick={() => setIsShagunModalOpen(true)}
+                className="py-3 px-3.5 rounded-full bg-[#4A1220] border border-amber-400/40 text-amber-200 text-xs font-bold flex items-center gap-1 shadow-md active:scale-95 transition-all shrink-0"
+                title="Send Digital Shagun via UPI"
+              >
+                <Gift className="w-3.5 h-3.5 text-amber-300" />
+                <span>Shagun</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -988,17 +1026,19 @@ export const PublicEventPage: React.FC = () => {
       </Suspense>
 
       {/* Digital Shagun Modal */}
-      <Suspense fallback={null}>
-        <DigitalShagunModal
-          isOpen={isShagunModalOpen}
-          onClose={() => setIsShagunModalOpen(false)}
-          hostName={evt.host_name || 'Gupta & Sharma Families'}
-          eventTitle={evt.title}
-          upiId={evt.upi_id}
-          upiMobile={evt.host_upi_mobile}
-          upiQrUrl={evt.upi_qr_url}
-        />
-      </Suspense>
+      {hasShagun && (
+        <Suspense fallback={null}>
+          <DigitalShagunModal
+            isOpen={isShagunModalOpen}
+            onClose={() => setIsShagunModalOpen(false)}
+            hostName={evt.host_name || celebrantOrCouple || 'The Host'}
+            eventTitle={evt.title}
+            upiId={evt.upi_id}
+            upiMobile={evt.host_upi_mobile}
+            upiQrUrl={evt.upi_qr_url}
+          />
+        </Suspense>
+      )}
 
       {/* Gate Entry Pass Modal */}
       {isPassModalOpen && (
@@ -1054,7 +1094,7 @@ export const PublicEventPage: React.FC = () => {
         <EventWelcomeWallModal
           isOpen={isWelcomeWallOpen}
           onClose={() => setIsWelcomeWallOpen(false)}
-          guestName={guestPersonalization?.guest_name || 'Amit Gupta & Family'}
+          guestName={guestPersonalization?.guest_name || 'Valued Guest'}
           salutation={guestPersonalization?.salutation || 'Dear Valued Guest'}
           eventTitle={evt.title}
           passCode={guestPersonalization?.pass_code || 'NIM-ENTRY-PASS'}

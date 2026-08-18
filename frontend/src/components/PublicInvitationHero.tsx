@@ -1,21 +1,15 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  MapPin,
   Calendar,
   Heart,
   Sparkles,
-  Gift,
-  ExternalLink,
-  Download,
   ChevronDown,
   Volume2,
   VolumeX,
-  ShieldCheck,
   RotateCcw,
-  Compass,
 } from 'lucide-react';
 import { ThemeTokens } from '../utils/themeEngine';
-import { downloadIcsCalendarFile } from '../utils/calendarExport';
+import { getCelebrationConfig } from '../utils/celebrationEngine';
 import { InteractiveGiftBox } from './InteractiveGiftBox';
 
 interface PublicInvitationHeroProps {
@@ -23,6 +17,7 @@ interface PublicInvitationHeroProps {
   hindiTitle?: string;
   englishTitle?: string;
   coupleNames?: string;
+  celebrantName?: string;
   invitationMessage?: string;
   eventType?: string;
   startDate?: string;
@@ -50,6 +45,7 @@ export const PublicInvitationHero: React.FC<PublicInvitationHeroProps> = ({
   hindiTitle,
   englishTitle,
   coupleNames,
+  celebrantName,
   invitationMessage,
   eventType = 'CELEBRATION',
   startDate,
@@ -71,6 +67,8 @@ export const PublicInvitationHero: React.FC<PublicInvitationHeroProps> = ({
   onOpenGiftComplete,
   onResetGift,
 }) => {
+  const cfg = getCelebrationConfig(eventType, hostName || '', celebrantName || coupleNames || '');
+
   const formattedDate = formatDateSafe(startDate, {
     weekday: 'long',
     day: 'numeric',
@@ -82,40 +80,14 @@ export const PublicInvitationHero: React.FC<PublicInvitationHeroProps> = ({
     ? new Date(startDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
     : '07:00 PM';
 
-  const fullVenue = venueName ? `${venueName}${venueAddress ? ', ' + venueAddress : ''}` : 'Celebration Venue';
-  const mapsUrl = googleMapsUrl || `https://maps.google.com/?q=${encodeURIComponent(fullVenue)}`;
-
-  const handleGoogleCalendar = () => {
-    const eventDateObj = startDate ? new Date(startDate) : new Date('2026-12-18T18:30:00');
-    const validDate = isNaN(eventDateObj.getTime()) ? new Date('2026-12-18T18:30:00') : eventDateObj;
-    const start = validDate.toISOString().replace(/-|:|\.\d\d\d/g, '');
-    const end = new Date(validDate.getTime() + 4 * 3600 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, '');
-    const details = invitationMessage || `You are graciously invited to celebrate ${title}!`;
-    const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-      title || 'Celebration'
-    )}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(fullVenue)}&dates=${start}/${end}`;
-    window.open(gcalUrl, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleDownloadIcs = () => {
-    const validDateStr =
-      startDate && !isNaN(new Date(startDate).getTime())
-        ? startDate
-        : new Date('2026-12-18T18:30:00').toISOString();
-    downloadIcsCalendarFile({
-      title: title || 'Grand Celebration',
-      description: invitationMessage || `You are graciously invited to celebrate ${title}!`,
-      venue_name: fullVenue,
-      start_date: validDateStr,
-    });
-  };
-
   const scrollToContent = () => {
     const target = document.getElementById('event-details-section');
     if (target) {
       target.scrollIntoView({ behavior: 'smooth' });
     }
   };
+
+  const displayName = celebrantName || coupleNames || title;
 
   return (
     <section
@@ -126,7 +98,7 @@ export const PublicInvitationHero: React.FC<PublicInvitationHeroProps> = ({
       <div className="w-full flex items-center justify-between z-30 pt-1 max-w-3xl mx-auto">
         <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-black/60 border border-amber-400/40 text-amber-300 text-[10px] font-mono font-bold uppercase tracking-widest backdrop-blur-md shadow-md">
           <Sparkles className="w-3 h-3 text-amber-400 animate-spin" />
-          <span>{eventType.toUpperCase()}</span>
+          <span>{cfg.heroTag}</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -168,6 +140,7 @@ export const PublicInvitationHero: React.FC<PublicInvitationHeroProps> = ({
           <InteractiveGiftBox
             eventTitle={title}
             coupleNames={coupleNames}
+            celebrantName={celebrantName}
             hindiTitle={hindiTitle}
             salutation={salutation}
             guestName={guestName}
@@ -180,23 +153,23 @@ export const PublicInvitationHero: React.FC<PublicInvitationHeroProps> = ({
         ) : (
           /* 🌟 CINEMATIC REVEALED INVITATION CARD 🌟 */
           <div className="w-full space-y-6 sm:space-y-8 animate-in fade-in zoom-in-95 duration-700">
-            {/* Shloka Header */}
+            {/* Auspicious / Formal Header if present */}
             {hindiTitle && (
               <div className="text-amber-300 font-serif font-bold text-sm sm:text-base tracking-widest drop-shadow-md">
                 {hindiTitle}
               </div>
             )}
 
-            {/* Couple / Celebration Title */}
+            {/* Celebration Title / Celebrant */}
             <div className="space-y-2">
               <span className="text-[11px] sm:text-xs font-mono uppercase tracking-[0.25em] font-extrabold text-amber-200/90 block">
-                TOGETHER WITH THEIR FAMILIES
+                {salutation || cfg.salutationPrefix}
               </span>
               <h1 className="font-serif text-3xl sm:text-5xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#FFF5DC] via-[#FFD700] to-[#E5C07B] drop-shadow-[0_4px_15px_rgba(212,175,55,0.4)] tracking-wide leading-tight">
-                {coupleNames || title}
+                {displayName}
               </h1>
-              <p className="font-serif text-sm sm:text-lg text-amber-100/90 italic font-medium">
-                Joyfully invite you to celebrate their special day
+              <p className="font-serif text-sm sm:text-lg text-amber-100/90 italic font-medium max-w-xl mx-auto">
+                {invitationMessage || `Cordially request the pleasure of your presence to celebrate with us.`}
               </p>
             </div>
 
@@ -225,7 +198,7 @@ export const PublicInvitationHero: React.FC<PublicInvitationHeroProps> = ({
                   }}
                 >
                   <Heart className="w-4 h-4 fill-amber-300 text-amber-300" />
-                  <span>WILL YOU ATTEND? RSVP NOW</span>
+                  <span>RSVP • CONFIRM ATTENDANCE</span>
                 </button>
               )}
 
@@ -234,7 +207,7 @@ export const PublicInvitationHero: React.FC<PublicInvitationHeroProps> = ({
                 onClick={scrollToContent}
                 className="w-full sm:w-auto px-6 py-3.5 rounded-full bg-black/50 hover:bg-black/70 text-amber-200 border border-amber-400/50 font-serif font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all"
               >
-                <span>Explore Celebration</span>
+                <span>Explore Details</span>
                 <ChevronDown className="w-4 h-4 text-amber-400 animate-bounce" />
               </button>
             </div>

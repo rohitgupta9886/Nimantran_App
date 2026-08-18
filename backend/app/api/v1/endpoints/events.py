@@ -16,8 +16,21 @@ from app.models.user import User
 from app.models.event import Event
 from app.models.master_contact import MasterContact
 
+from app.services.theme_catalog_service import ThemeCatalogService
+
 router = APIRouter()
 ai_service = AIService()
+
+
+@router.get("/themes", response_model=ResponseModel[List[dict]])
+async def get_celebration_themes(
+    celebration_type: Optional[str] = None,
+):
+    """
+    Retrieve celebration-specific theme catalogue with filtering by celebration type.
+    """
+    themes = ThemeCatalogService.get_themes(celebration_type)
+    return ResponseModel(data=themes, message="Themes retrieved successfully")
 
 
 @router.post("", response_model=ResponseModel[EventRead])

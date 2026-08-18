@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Heart, Gift, RotateCcw, Unlock, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { getCelebrationConfig } from '../utils/celebrationEngine';
 
 interface InteractiveGiftBoxProps {
   eventTitle?: string;
   coupleNames?: string;
+  celebrantName?: string;
   hindiTitle?: string;
   salutation?: string;
   guestName?: string;
@@ -19,6 +21,7 @@ interface InteractiveGiftBoxProps {
 export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
   eventTitle = 'Grand Celebration',
   coupleNames,
+  celebrantName,
   hindiTitle = '|| श्री गणेशाय नमः ||',
   salutation,
   guestName,
@@ -249,6 +252,8 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
     if (onReset) onReset();
   };
 
+  const cfg = getCelebrationConfig(eventType, '', celebrantName || coupleNames);
+
   return (
     <div className="relative w-full flex flex-col items-center justify-center my-2 sm:my-4 z-20 select-none">
       
@@ -336,7 +341,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-amber-500/20 border border-amber-300/60 shadow-[0_0_20px_rgba(200,155,90,0.3)] backdrop-blur-md">
               <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
               <span className="text-[11px] sm:text-xs font-serif font-extrabold uppercase tracking-widest text-amber-200">
-                {guestName ? `A Special Gift For ${guestName}` : 'A Special Invitation Awaits You'}
+                {guestName ? `${cfg.giftBoxTag} For ${guestName}` : cfg.giftBoxTag}
               </span>
               <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
             </div>
@@ -388,7 +393,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
               >
                 <div className="flex items-center gap-1.5 text-amber-300 font-serif text-xs font-bold tracking-wider">
                   <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                  <span>INVITATION UNLOCKED</span>
+                  <span>{cfg.giftBoxOpenedBadge}</span>
                   <Sparkles className="w-3.5 h-3.5 animate-spin" />
                 </div>
               </div>
@@ -446,10 +451,10 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
                   >
                     <div className="text-2xl animate-bounce">👑</div>
                     <h4 className="font-serif italic font-extrabold text-base sm:text-lg text-transparent bg-clip-text bg-gradient-to-r from-[#FFE58F] to-[#E5C07B] truncate">
-                      {coupleNames || eventTitle}
+                      {celebrantName || coupleNames || eventTitle}
                     </h4>
                     <p className="text-[11px] font-mono font-bold text-amber-300 tracking-wider uppercase animate-pulse">
-                      ✨ Unveiling Royal Invitation ✨
+                      ✨ Unveiling Special Invitation ✨
                     </p>
                   </div>
                 </div>
@@ -483,7 +488,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
               
               <Gift className="w-4 h-4 text-amber-300 animate-bounce" />
               <span className="drop-shadow-md text-amber-200 font-extrabold tracking-widest">
-                {isOpening ? 'OPENING INVITATION GIFT...' : 'TAP TO OPEN YOUR INVITATION'}
+                {isOpening ? 'OPENING INVITATION...' : cfg.giftBoxCta}
               </span>
               <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
             </button>
@@ -511,7 +516,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
           <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-black/50 border border-amber-400/40 backdrop-blur-md text-xs font-mono text-amber-300 shadow-lg">
             <span className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs">
               <Check className="w-4 h-4 text-emerald-400" />
-              <span>GIFT UNWRAPPED ✓</span>
+              <span>{cfg.giftBoxOpenedBadge}</span>
             </span>
 
             <button
