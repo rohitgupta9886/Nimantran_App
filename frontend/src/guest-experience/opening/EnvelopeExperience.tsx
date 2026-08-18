@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { Sparkles, Heart, Unlock, Volume2, VolumeX } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Sparkles, Heart, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import gsap from 'gsap';
 import { CelebrationTheme } from '../../utils/themeCatalog';
 import { getCelebrationConfig } from '../../utils/celebrationEngine';
 
@@ -37,8 +38,31 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
 
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const envelopeRef = useRef<HTMLDivElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const flapRef = useRef<HTMLDivElement | null>(null);
+  const sealRef = useRef<HTMLDivElement | null>(null);
 
   const cfg = getCelebrationConfig(eventType, '', title);
+
+  // Determine Auspicious Seal Emblem based on Event Type
+  const getSealEmblem = () => {
+    switch (eventType.toUpperCase()) {
+      case 'WEDDING':
+      case 'ENGAGEMENT':
+      case 'MUNDAN':
+        return 'ॐ';
+      case 'BIRTHDAY':
+        return '🎂';
+      case 'ANNIVERSARY':
+        return '❤️';
+      case 'FESTIVAL':
+        return '🪔';
+      case 'CORPORATE':
+        return '✦';
+      default:
+        return '✨';
+    }
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (openingStage !== 'IDLE' || !envelopeRef.current) return;
@@ -46,8 +70,8 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
     const x = e.clientX - rect.left - rect.width / 2;
     const y = e.clientY - rect.top - rect.height / 2;
     setTilt({
-      x: (-y / (rect.height / 2)) * 8,
-      y: (x / (rect.width / 2)) * 8,
+      x: (-y / (rect.height / 2)) * 7,
+      y: (x / (rect.width / 2)) * 7,
     });
   };
 
@@ -55,14 +79,14 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
     setTilt({ x: 0, y: 0 });
   };
 
-  // Synthesize Sub-Bass Boom & Pentatonic Chime on Gesture
+  // Synthesize Sub-Bass Impact Boom & Pentatonic Chime on Gesture
   const playOpeningAudio = () => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
 
-      // Sub-Bass Boom
+      // 1. Sub-Bass Impact Boom (120Hz -> 20Hz)
       const boom = ctx.createOscillator();
       const boomGain = ctx.createGain();
       boom.type = 'triangle';
@@ -75,7 +99,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
       boom.start();
       boom.stop(ctx.currentTime + 1.8);
 
-      // Pentatonic Chime Sweep
+      // 2. Pentatonic Royal Chime Sweep
       [523.25, 659.25, 783.99, 1046.5, 1318.51].forEach((freq, i) => {
         const chime = ctx.createOscillator();
         const chimeGain = ctx.createGain();
@@ -147,14 +171,12 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
     onOpenComplete();
   };
 
-  const { colorPalette } = theme;
-
   return (
     <div
       className="relative w-full min-h-[90svh] flex flex-col items-center justify-center select-none py-6 px-3"
       style={{ perspective: '1200px' }}
     >
-      {/* Top Header: Guest Greeting */}
+      {/* Top Header: Guest Personalized Salutation */}
       <div className="text-center space-y-1.5 mb-6 z-20 animate-in fade-in duration-500 max-w-md mx-auto">
         <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-black/60 border border-amber-300/60 shadow-[0_0_20px_rgba(245,158,11,0.25)] backdrop-blur-xl">
           <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
@@ -188,7 +210,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
         {/* Layer 1: Ambient Depth Shadow */}
         <div className="absolute -bottom-6 inset-x-8 h-10 bg-black/70 blur-xl rounded-full transform group-hover:scale-105 transition-transform pointer-events-none" />
 
-        {/* Layer 2: Envelope Back Panel & Gold Lining */}
+        {/* Layer 2: Envelope Back Panel & Gold Foil Lining */}
         <div
           className="absolute inset-0 rounded-2xl border-2 border-amber-300/80 shadow-2xl overflow-hidden"
           style={{
@@ -208,6 +230,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
 
         {/* Layer 3: Rising Inner Invitation Card */}
         <div
+          ref={cardRef}
           className="absolute inset-x-4 h-[210px] sm:h-[250px] rounded-xl border-2 border-amber-300 shadow-2xl flex flex-col items-center justify-between p-4 text-center z-10 transition-all duration-700 ease-out"
           style={{
             background: 'linear-gradient(135deg, #FFFDF9 0%, #FAF5EB 100%)',
@@ -270,6 +293,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
 
         {/* Layer 5: 3D Top Flap with Wax Seal */}
         <div
+          ref={flapRef}
           className="absolute inset-x-0 top-0 h-3/5 origin-top z-30 transition-transform duration-700 ease-in-out"
           style={{
             clipPath: 'polygon(0 0, 100% 0, 50% 100%)',
@@ -290,6 +314,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
         {/* Layer 6: Auspicious Wax Seal / Monogram */}
         {openingStage === 'IDLE' || openingStage === 'TAP_PULSE' || openingStage === 'SEAL_UNLOCK' ? (
           <div
+            ref={sealRef}
             className={`absolute top-[46%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 w-14 h-14 rounded-full border-2 border-amber-300 flex items-center justify-center shadow-[0_0_25px_rgba(245,158,11,0.6)] transition-all duration-300 ${
               openingStage === 'SEAL_UNLOCK'
                 ? 'scale-125 opacity-0 rotate-45'
@@ -300,7 +325,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
             }}
           >
             <span className="font-serif font-extrabold text-amber-200 text-lg drop-shadow-md">
-              ॐ
+              {getSealEmblem()}
             </span>
             <div className="absolute inset-0 rounded-full border border-dashed border-amber-200/50 animate-spin duration-3000" />
           </div>

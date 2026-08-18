@@ -15,6 +15,7 @@
     "canvas-confetti": "^1.9.2",
     "clsx": "^2.1.0",
     "framer-motion": "^11.0.8",
+    "gsap": "^3.15.0",
     "html-to-image": "^1.11.13",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^2.5.1",
