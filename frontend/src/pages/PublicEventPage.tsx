@@ -23,6 +23,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import confetti from 'canvas-confetti';
 import { apiFetch } from '../services/api';
 import { PublicInvitationHero } from '../components/PublicInvitationHero';
 import { WebGLShaderBackground } from '../components/WebGLShaderBackground';
@@ -228,6 +229,14 @@ export const PublicEventPage: React.FC = () => {
 
       if (status === 'CONFIRMED') {
         setIsConfirmedState(true);
+        try {
+          confetti({
+            particleCount: 90,
+            spread: 80,
+            origin: { y: 0.6 },
+            colors: ['#D6AA61', '#C95C78', '#F0D7A4', '#7A1F3D', '#FFFFFF'],
+          });
+        } catch (e) {}
       }
     } catch (err: any) {
       alert(err.message || 'Failed to submit RSVP');
@@ -355,7 +364,7 @@ export const PublicEventPage: React.FC = () => {
   return (
     <div
       className="min-h-[100svh] min-h-screen font-sans pb-32 relative overflow-x-hidden text-[#302829] selection:bg-amber-400 selection:text-black"
-      style={{ backgroundColor: '#0F0206' }}
+      style={{ backgroundColor: 'transparent' }}
     >
       {/* Background Celebration Audio Element */}
       {musicTrackUrl && <audio ref={audioRef} src={musicTrackUrl} loop preload="auto" />}

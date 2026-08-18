@@ -257,40 +257,67 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
         <div className="fixed inset-0 bg-black/65 backdrop-blur-[2px] pointer-events-none z-30 transition-opacity duration-700 animate-in fade-in" />
       )}
 
-      {/* 🌟 2. FLOATING ROSE PETALS & HEARTS LAYER (STAGES 5 TO 7) 🌟 */}
+      {/* 🌟 2. FLOATING ROSE PETALS & GLASS HEARTS LAYER (STAGES 5 TO 7) 🌟 */}
       {stage >= 5 && stage < 8 && (
         <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
           {floatingPetals.map((p) => (
             <div
               key={`petal-${p.id}`}
-              className="absolute text-rose-400 opacity-85 animate-in fade-in"
+              className="absolute animate-in fade-in"
               style={{
                 left: `${p.left}%`,
                 top: '-5%',
-                fontSize: `${p.size}px`,
+                width: `${p.size * 1.5}px`,
+                height: `${p.size * 1.8}px`,
                 animation: `floatPetal ${p.duration}s linear forwards`,
                 animationDelay: `${p.delay}s`,
-                filter: 'drop-shadow(0 2px 8px rgba(225,29,72,0.5))',
               }}
             >
-              🌸
+              <svg viewBox="0 0 40 50" className="w-full h-full drop-shadow-[0_4px_12px_rgba(201,92,120,0.6)]">
+                <path
+                  d="M20 5 C5 15, 2 35, 20 48 C38 35, 35 15, 20 5 Z"
+                  fill="url(#boxPetalGrad)"
+                />
+                <defs>
+                  <linearGradient id="boxPetalGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="#C95C78" />
+                    <stop offset="60%" stopColor="#7A1F3D" />
+                    <stop offset="100%" stopColor="#350D1D" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </div>
           ))}
 
           {floatingHearts.map((h) => (
             <div
               key={`heart-${h.id}`}
-              className="absolute text-amber-300 opacity-90"
+              className="absolute"
               style={{
                 left: `${h.left}%`,
                 bottom: '15%',
-                fontSize: `${h.size}px`,
+                width: `${h.size * 2.8}px`,
+                height: `${h.size * 2.8}px`,
                 animation: `floatHeartUp ${h.duration}s ease-out forwards`,
                 animationDelay: `${h.delay}s`,
-                filter: 'drop-shadow(0 0 10px rgba(255,215,0,0.8))',
               }}
             >
-              💖
+              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_20px_rgba(214,170,97,0.85)]">
+                <path
+                  d="M50 25 C35 5, 5 15, 15 45 C25 65, 50 85, 50 90 C50 85, 75 65, 85 45 C95 15, 65 5, 50 25 Z"
+                  fill="url(#boxHeartGrad)"
+                  stroke="#F0D7A4"
+                  strokeWidth="2"
+                />
+                <circle cx="35" cy="35" r="6" fill="rgba(255,255,255,0.6)" />
+                <defs>
+                  <linearGradient id="boxHeartGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor="rgba(214, 170, 97, 0.65)" />
+                    <stop offset="50%" stopColor="rgba(201, 92, 120, 0.75)" />
+                    <stop offset="100%" stopColor="rgba(53, 13, 29, 0.9)" />
+                  </linearGradient>
+                </defs>
+              </svg>
             </div>
           ))}
         </div>
