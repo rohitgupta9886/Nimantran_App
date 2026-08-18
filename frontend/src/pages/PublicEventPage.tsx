@@ -27,6 +27,7 @@ import { WebGLShaderBackground } from '../components/WebGLShaderBackground';
 import { getThemeTokens } from '../utils/themeEngine';
 import { getCelebrationConfig } from '../utils/celebrationEngine';
 import { downloadIcsCalendarFile } from '../utils/calendarExport';
+import { CelebrationCountdown } from '../components/CelebrationCountdown';
 
 // Lazy-load below-the-fold modal and story components
 const ParallaxStoryEngine = lazy(() =>
@@ -447,6 +448,14 @@ export const PublicEventPage: React.FC = () => {
         id="invitation-experience"
         className="max-w-3xl mx-auto px-4 sm:px-6 space-y-12 sm:space-y-16 pt-4 relative z-10"
       >
+        {/* 🌟 1.5. CELEBRATION COUNTDOWN TIMER WIDGET 🌟 */}
+        {evt.start_date && (
+          <CelebrationCountdown
+            targetDate={evt.start_date}
+            celebrationType={evt.event_type}
+          />
+        )}
+
         {/* 🌟 2. EVENT DETAILS & VENUE SECTION 🌟 */}
         <section id="event-details-section" className="space-y-5">
           <div className="text-center space-y-1">
@@ -584,23 +593,37 @@ export const PublicEventPage: React.FC = () => {
         {(evt.invitation_message || canonical.message || evt.description) && (
           <section
             id="invitation-message-section"
-            className="p-6 sm:p-8 rounded-3xl border-2 border-amber-300/60 bg-gradient-to-b from-[#2A0A14]/90 to-[#1A040C]/90 backdrop-blur-xl text-center space-y-4 shadow-xl"
+            className="p-6 sm:p-9 rounded-3xl border-2 border-amber-300/70 relative overflow-hidden backdrop-blur-2xl text-center space-y-4 shadow-2xl"
+            style={{
+              background: 'linear-gradient(135deg, rgba(42, 10, 20, 0.95) 0%, rgba(22, 4, 11, 0.98) 100%)',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8), inset 0 0 30px rgba(245, 158, 11, 0.08)',
+            }}
           >
+            {/* Ornate Gold Corner Brackets */}
+            <div className="absolute top-2.5 left-2.5 w-4 h-4 border-t-2 border-l-2 border-amber-400/80 pointer-events-none" />
+            <div className="absolute top-2.5 right-2.5 w-4 h-4 border-t-2 border-r-2 border-amber-400/80 pointer-events-none" />
+            <div className="absolute bottom-2.5 left-2.5 w-4 h-4 border-b-2 border-l-2 border-amber-400/80 pointer-events-none" />
+            <div className="absolute bottom-2.5 right-2.5 w-4 h-4 border-b-2 border-r-2 border-amber-400/80 pointer-events-none" />
+
             {evt.hindi_title && (
-              <div className="text-amber-300 font-serif font-bold text-base">{evt.hindi_title}</div>
+              <div className="text-amber-300 font-serif font-bold text-base sm:text-lg tracking-widest drop-shadow-md">
+                {evt.hindi_title}
+              </div>
             )}
             
             {canonical.greeting && (
-              <div className="text-amber-200 font-serif text-sm font-semibold">{canonical.greeting}</div>
+              <div className="text-amber-200 font-serif text-sm sm:text-base font-semibold tracking-wide">
+                {canonical.greeting}
+              </div>
             )}
 
-            <p className="text-sm sm:text-base font-serif italic text-white leading-relaxed max-w-xl mx-auto">
+            <p className="text-sm sm:text-base md:text-lg font-serif italic text-amber-50/95 leading-relaxed max-w-xl mx-auto drop-shadow-sm">
               "{evt.invitation_message || canonical.message || evt.description}"
             </p>
 
-            <div className="w-24 h-px bg-amber-400/40 mx-auto my-2" />
+            <div className="w-32 h-px bg-gradient-to-r from-transparent via-amber-400/60 to-transparent mx-auto my-3" />
 
-            <div className="text-xs text-amber-300 font-serif italic pt-1">
+            <div className="text-xs sm:text-sm text-amber-300 font-serif italic pt-1">
               {canonical.blessing || `विनीतः: ${evt.host_name || 'समस्त परिवार'}`}
             </div>
           </section>
@@ -831,16 +854,26 @@ export const PublicEventPage: React.FC = () => {
         {/* 🌟 6. DIGITAL ENTRY PASS SECTION 🌟 */}
         <section
           id="guest-pass-section"
-          className="p-6 sm:p-8 rounded-3xl border-2 border-amber-300/70 bg-gradient-to-b from-[#20050E] to-[#120207] text-center space-y-5 shadow-2xl"
+          className="p-6 sm:p-9 rounded-3xl border-2 border-amber-300/80 text-center space-y-5 shadow-2xl relative overflow-hidden backdrop-blur-2xl"
+          style={{
+            background: 'linear-gradient(135deg, rgba(35, 6, 15, 0.96) 0%, rgba(16, 2, 8, 0.98) 100%)',
+            boxShadow: '0 25px 60px -15px rgba(0,0,0,0.9), inset 0 0 35px rgba(245, 158, 11, 0.1)',
+          }}
         >
+          {/* Ornate Gold Corner Brackets */}
+          <div className="absolute top-2.5 left-2.5 w-4 h-4 border-t-2 border-l-2 border-amber-400/80 pointer-events-none" />
+          <div className="absolute top-2.5 right-2.5 w-4 h-4 border-t-2 border-r-2 border-amber-400/80 pointer-events-none" />
+          <div className="absolute bottom-2.5 left-2.5 w-4 h-4 border-b-2 border-l-2 border-amber-400/80 pointer-events-none" />
+          <div className="absolute bottom-2.5 right-2.5 w-4 h-4 border-b-2 border-r-2 border-amber-400/80 pointer-events-none" />
+
           <div className="space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-widest font-extrabold text-emerald-400 inline-flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> OFFICIAL GUEST ENTRY PASS
+            <span className="text-[10px] sm:text-xs font-mono uppercase tracking-widest font-extrabold text-emerald-400 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-400/40">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" /> OFFICIAL GUEST ENTRY PASS
             </span>
-            <h3 className="font-serif text-xl sm:text-2xl font-extrabold text-white">
+            <h3 className="font-serif text-2xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#FFF5DC] via-[#FFD700] to-[#E5C07B] drop-shadow-md">
               {guestPersonalization?.guest_name || 'Valued Guest'}
             </h3>
-            <p className="text-xs font-mono text-slate-400">
+            <p className="text-xs font-mono text-amber-200/80">
               Present this QR Code or Passcode at the reception entrance.
             </p>
           </div>
