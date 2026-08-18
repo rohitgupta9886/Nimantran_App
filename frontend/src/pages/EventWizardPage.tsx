@@ -24,6 +24,8 @@ import {
 import { 
   MASTER_THEME_CATALOG,
   THEME_FILTER_TAGS,
+  THEME_MODE_FILTERS,
+  THEME_STYLE_FILTERS,
   getFilteredCelebrationThemes,
   getCelebrationThemeById,
   getRecommendedThemeForOccasion,
@@ -64,8 +66,10 @@ export const EventWizardPage: React.FC = () => {
   const [googleMapsUrl, setGoogleMapsUrl] = useState('');
 
   // DESIGN & PERSONALIZATION STATE
-  const [selectedThemeId, setSelectedThemeId] = useState('wedding-royal-marigold');
+  const [selectedThemeId, setSelectedThemeId] = useState('wedding-royal-heritage');
   const [themeFilterTag, setThemeFilterTag] = useState<string>('ALL');
+  const [modeFilter, setModeFilter] = useState<string>('ALL');
+  const [styleFilter, setStyleFilter] = useState<string>('ALL');
   const [previewThemeModalItem, setPreviewThemeModalItem] = useState<CelebrationTheme | null>(null);
   const [hindiTitle, setHindiTitle] = useState('|| श्री गणेशाय नमः ||');
   const [invitationMessage, setInvitationMessage] = useState('Together with our families, we cordially invite you to celebrate our special day with us. Your presence and blessings will make our celebration complete.');
@@ -770,11 +774,56 @@ export const EventWizardPage: React.FC = () => {
                 </button>
               ))}
             </div>
+
+            {/* Mode & Style Secondary Filter Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#E9D3D0]/60">
+              {/* Mode Selectors */}
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <span className="text-[11px] font-mono font-bold text-[#8C7E80] uppercase mr-1">
+                  Palette:
+                </span>
+                {THEME_MODE_FILTERS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setModeFilter(m.id)}
+                    className={`px-3 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                      modeFilter === m.id
+                        ? 'bg-[#302829] text-white shadow-sm'
+                        : 'bg-[#FAF7F3] text-[#8C7E80] hover:text-[#302829] border border-[#E9D3D0]'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Style Selectors */}
+              <div className="flex items-center gap-1.5 overflow-x-auto">
+                <span className="text-[11px] font-mono font-bold text-[#8C7E80] uppercase mr-1">
+                  Style:
+                </span>
+                {THEME_STYLE_FILTERS.slice(0, 6).map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setStyleFilter(s.id)}
+                    className={`px-3 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                      styleFilter === s.id
+                        ? 'bg-[#9E6F6D] text-white shadow-sm'
+                        : 'bg-[#FAF7F3] text-[#8C7E80] hover:text-[#302829] border border-[#E9D3D0]'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Image-First Celebration Design Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7">
-            {getFilteredCelebrationThemes(themeFilterTag, eventType).map((themeItem) => {
+            {getFilteredCelebrationThemes(themeFilterTag, eventType, modeFilter, styleFilter).map((themeItem) => {
               const isSelected = selectedThemeId === themeItem.id;
               const isOccasionMatch =
                 themeItem.recommendedOccasions.includes((eventType || '').toUpperCase()) ||
