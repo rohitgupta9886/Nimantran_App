@@ -24,7 +24,7 @@ interface FloatingElement {
   strokeColor: string;
   swayFreq: number;
   swayAmp: number;
-  type: 'heart' | 'glass' | 'star' | 'lotus' | 'prism' | 'petal' | 'confetti';
+  type: 'heart' | 'glass' | 'rings' | 'star' | 'petal' | 'bokeh';
 }
 
 interface Particle {
@@ -35,6 +35,8 @@ interface Particle {
   vx: number;
   vy: number;
   alpha: number;
+  pulseSpeed: number;
+  pulsePhase: number;
   layer: 'bg' | 'mid' | 'fg';
 }
 
@@ -42,14 +44,24 @@ export const WebGLShaderBackground: React.FC<WebGLShaderBackgroundProps> = ({ ev
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isLowPowerMode, setIsLowPowerMode] = useState(false);
   const scrollYRef = useRef(0);
+  const mouseRef = useRef({ x: 0.5, y: 0.5, targetX: 0.5, targetY: 0.5 });
   const category: CelebrationCategory = getCelebrationCategory(eventType);
 
   useEffect(() => {
     const handleScroll = () => {
       scrollYRef.current = window.scrollY || window.pageYOffset || 0;
     };
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseRef.current.targetX = e.clientX / window.innerWidth;
+      mouseRef.current.targetY = e.clientY / window.innerHeight;
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
   }, []);
 
   useEffect(() => {
@@ -82,7 +94,7 @@ export const WebGLShaderBackground: React.FC<WebGLShaderBackgroundProps> = ({ ev
 
     const isMobile = width < 640;
 
-    // Helper: Draw Glass Heart Vector Shape
+    // Helper: Draw 3D Glass & Velvet Heart
     const drawHeart = (
       c: CanvasRenderingContext2D,
       hx: number,
@@ -112,22 +124,23 @@ export const WebGLShaderBackground: React.FC<WebGLShaderBackgroundProps> = ({ ev
       grad.addColorStop(1, gradColors[1]);
       c.fillStyle = grad;
       c.shadowColor = strokeColor;
-      c.shadowBlur = s > 60 ? 18 : 10;
+      c.shadowBlur = s > 50 ? 20 : 10;
       c.fill();
 
       c.strokeStyle = strokeColor;
-      c.lineWidth = s > 70 ? 2.5 : 1.5;
+      c.lineWidth = s > 60 ? 2.5 : 1.5;
       c.stroke();
 
+      // Specular Glass Reflection Highlight
       c.beginPath();
-      c.arc(-s * 0.28, -s * 0.38, s * 0.18, 0, Math.PI * 2);
-      c.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      c.ellipse(-s * 0.28, -s * 0.38, s * 0.16, s * 0.08, -Math.PI / 4, 0, Math.PI * 2);
+      c.fillStyle = 'rgba(255, 255, 255, 0.65)';
       c.fill();
 
       c.restore();
     };
 
-    // Helper: Draw Glass Champagne / Wine Glass
+    // Helper: Draw 3D Crystal Wine / Champagne Flute
     const drawWineGlass = (
       c: CanvasRenderingContext2D,
       gx: number,
@@ -147,26 +160,29 @@ export const WebGLShaderBackground: React.FC<WebGLShaderBackgroundProps> = ({ ev
       const bowlHeight = isFlute ? h * 0.58 : h * 0.48;
       const baseWidth = w * 0.75;
 
+      // Base Pedestal
       c.beginPath();
       c.ellipse(0, h * 0.48, baseWidth / 2, h * 0.04, 0, 0, Math.PI * 2);
-      c.fillStyle = 'rgba(255, 255, 255, 0.25)';
-      c.strokeStyle = 'rgba(214, 170, 97, 0.6)';
+      c.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      c.strokeStyle = 'rgba(245, 158, 11, 0.7)';
       c.lineWidth = 1.5;
       c.fill();
       c.stroke();
 
+      // Stem
       c.beginPath();
       c.moveTo(-w * 0.04, 0);
       c.lineTo(-w * 0.04, h * 0.48);
       c.lineTo(w * 0.04, h * 0.48);
       c.lineTo(w * 0.04, 0);
       c.closePath();
-      c.fillStyle = 'rgba(255, 255, 255, 0.35)';
-      c.strokeStyle = 'rgba(214, 170, 97, 0.5)';
+      c.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      c.strokeStyle = 'rgba(245, 158, 11, 0.5)';
       c.lineWidth = 1;
       c.fill();
       c.stroke();
 
+      // Bowl Outer Glass
       c.beginPath();
       if (isFlute) {
         c.moveTo(-w * 0.24, -bowlHeight * 0.4);
@@ -178,475 +194,388 @@ export const WebGLShaderBackground: React.FC<WebGLShaderBackgroundProps> = ({ ev
         c.quadraticCurveTo(w * 0.48, 0, w * 0.38, -bowlHeight * 0.4);
       }
       c.closePath();
-      const liquidGrad = c.createLinearGradient(0, -bowlHeight * 0.5, 0, 0);
-      liquidGrad.addColorStop(0, liquidColor);
-      liquidGrad.addColorStop(1, 'rgba(53, 13, 29, 0.95)');
-      c.fillStyle = liquidGrad;
-      c.fill();
 
+      const glassGrad = c.createLinearGradient(-w * 0.4, 0, w * 0.4, 0);
+      glassGrad.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+      glassGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+      glassGrad.addColorStop(1, 'rgba(255, 255, 255, 0.4)');
+      c.fillStyle = glassGrad;
+      c.strokeStyle = 'rgba(245, 158, 11, 0.8)';
+      c.lineWidth = 1.8;
+      c.fill();
+      c.stroke();
+
+      // Sparkling Champagne / Rose Wine Liquid
       c.beginPath();
       if (isFlute) {
-        c.moveTo(-w * 0.3, -bowlHeight);
-        c.lineTo(-w * 0.28, -bowlHeight * 0.5);
-        c.quadraticCurveTo(-w * 0.3, 0, 0, 0);
-        c.quadraticCurveTo(w * 0.3, 0, w * 0.28, -bowlHeight * 0.5);
-        c.lineTo(w * 0.3, -bowlHeight);
+        c.moveTo(-w * 0.2, -bowlHeight * 0.1);
+        c.quadraticCurveTo(-w * 0.22, 0, 0, 0);
+        c.quadraticCurveTo(w * 0.22, 0, w * 0.2, -bowlHeight * 0.1);
       } else {
-        c.moveTo(-w * 0.4, -bowlHeight);
-        c.quadraticCurveTo(-w * 0.52, -bowlHeight * 0.4, 0, 0);
-        c.quadraticCurveTo(w * 0.52, -bowlHeight * 0.4, w * 0.4, -bowlHeight);
+        c.moveTo(-w * 0.32, -bowlHeight * 0.1);
+        c.quadraticCurveTo(-w * 0.38, 0, 0, 0);
+        c.quadraticCurveTo(w * 0.38, 0, w * 0.32, -bowlHeight * 0.1);
       }
       c.closePath();
-      c.strokeStyle = 'rgba(214, 170, 97, 0.75)';
+      c.fillStyle = liquidColor;
+      c.fill();
+
+      // Rising Champagne Bubbles
+      c.beginPath();
+      c.arc(0, -bowlHeight * 0.2, 1.5, 0, Math.PI * 2);
+      c.arc(-w * 0.08, -bowlHeight * 0.28, 1, 0, Math.PI * 2);
+      c.arc(w * 0.06, -bowlHeight * 0.34, 1.2, 0, Math.PI * 2);
+      c.fillStyle = '#FFFFFF';
+      c.fill();
+
+      // Rim Highlight
+      c.beginPath();
+      c.ellipse(0, -bowlHeight * 0.4, isFlute ? w * 0.24 : w * 0.38, h * 0.02, 0, 0, Math.PI * 2);
+      c.strokeStyle = 'rgba(255, 255, 255, 0.9)';
       c.lineWidth = 1.5;
       c.stroke();
+
       c.restore();
     };
 
-    // Helper: Draw 5-Point Celebration Star (Birthday / Party)
+    // Helper: Draw 3D Interlocking Wedding Rings
+    const drawInterlockingRings = (
+      c: CanvasRenderingContext2D,
+      rx: number,
+      ry: number,
+      size: number,
+      angle: number,
+      alpha: number
+    ) => {
+      c.save();
+      c.translate(rx, ry);
+      c.rotate(angle);
+      c.globalAlpha = Math.max(0, Math.min(1, alpha));
+
+      const r = size * 0.35;
+      // Ring 1 (Gold)
+      c.beginPath();
+      c.arc(-r * 0.5, 0, r, 0, Math.PI * 2);
+      c.strokeStyle = '#F59E0B';
+      c.lineWidth = size * 0.08;
+      c.shadowColor = '#FBBF24';
+      c.shadowBlur = 12;
+      c.stroke();
+
+      // Ring 2 (Rose Gold / Platinum)
+      c.beginPath();
+      c.arc(r * 0.5, 0, r, 0, Math.PI * 2);
+      c.strokeStyle = '#FDA4AF';
+      c.lineWidth = size * 0.08;
+      c.stroke();
+
+      // Solitaire Diamond Glimmer
+      c.beginPath();
+      c.arc(-r * 0.5, -r, size * 0.08, 0, Math.PI * 2);
+      c.fillStyle = '#FFFFFF';
+      c.shadowColor = '#FFFFFF';
+      c.shadowBlur = 15;
+      c.fill();
+
+      c.restore();
+    };
+
+    // Helper: Draw 3D Fluttering Rose Petals
+    const drawRosePetal = (
+      c: CanvasRenderingContext2D,
+      px: number,
+      py: number,
+      size: number,
+      angle: number,
+      alpha: number
+    ) => {
+      c.save();
+      c.translate(px, py);
+      c.rotate(angle);
+      c.globalAlpha = Math.max(0, Math.min(1, alpha));
+
+      c.beginPath();
+      c.moveTo(0, -size * 0.5);
+      c.bezierCurveTo(size * 0.4, -size * 0.3, size * 0.4, size * 0.3, 0, size * 0.5);
+      c.bezierCurveTo(-size * 0.4, size * 0.3, -size * 0.4, -size * 0.3, 0, -size * 0.5);
+      c.closePath();
+
+      const petalGrad = c.createRadialGradient(0, 0, 0, 0, 0, size * 0.5);
+      petalGrad.addColorStop(0, '#F43F5E');
+      petalGrad.addColorStop(0.7, '#E11D48');
+      petalGrad.addColorStop(1, '#881337');
+      c.fillStyle = petalGrad;
+      c.shadowColor = '#FB7185';
+      c.shadowBlur = 8;
+      c.fill();
+
+      c.restore();
+    };
+
+    // Helper: Draw Sparkling Starburst
     const drawStar = (
       c: CanvasRenderingContext2D,
-      cx: number,
-      cy: number,
-      spikes: number,
-      outerRadius: number,
-      innerRadius: number,
+      sx: number,
+      sy: number,
+      size: number,
       angle: number,
       alpha: number,
       color: string
     ) => {
       c.save();
-      c.translate(cx, cy);
+      c.translate(sx, sy);
       c.rotate(angle);
       c.globalAlpha = Math.max(0, Math.min(1, alpha));
 
-      let rot = (Math.PI / 2) * 3;
-      let x = 0;
-      let y = 0;
-      const step = Math.PI / spikes;
-
       c.beginPath();
-      c.moveTo(0, -outerRadius);
-      for (let i = 0; i < spikes; i++) {
-        x = Math.cos(rot) * outerRadius;
-        y = Math.sin(rot) * outerRadius;
-        c.lineTo(x, y);
-        rot += step;
-
-        x = Math.cos(rot) * innerRadius;
-        y = Math.sin(rot) * innerRadius;
-        c.lineTo(x, y);
-        rot += step;
+      for (let i = 0; i < 4; i++) {
+        c.moveTo(0, 0);
+        c.lineTo(0, -size);
+        c.lineTo(size * 0.15, -size * 0.15);
+        c.lineTo(size, 0);
+        c.lineTo(size * 0.15, size * 0.15);
+        c.lineTo(0, size);
+        c.lineTo(-size * 0.15, size * 0.15);
+        c.lineTo(-size, 0);
+        c.lineTo(-size * 0.15, -size * 0.15);
+        c.closePath();
       }
-      c.lineTo(0, -outerRadius);
-      c.closePath();
-
       c.fillStyle = color;
       c.shadowColor = color;
-      c.shadowBlur = 14;
-      c.fill();
-      c.restore();
-    };
-
-    // Helper: Draw Sacred Lotus Petal (Mundan / Baby / Devotional)
-    const drawLotus = (
-      c: CanvasRenderingContext2D,
-      lx: number,
-      ly: number,
-      size: number,
-      angle: number,
-      alpha: number
-    ) => {
-      c.save();
-      c.translate(lx, ly);
-      c.rotate(angle);
-      c.globalAlpha = Math.max(0, Math.min(1, alpha));
-
-      c.beginPath();
-      c.moveTo(0, -size);
-      c.quadraticCurveTo(size * 0.7, -size * 0.3, 0, size * 0.8);
-      c.quadraticCurveTo(-size * 0.7, -size * 0.3, 0, -size);
-      c.closePath();
-
-      const lGrad = c.createLinearGradient(0, -size, 0, size);
-      lGrad.addColorStop(0, '#F59E0B');
-      lGrad.addColorStop(0.5, '#EC4899');
-      lGrad.addColorStop(1, '#B45309');
-      c.fillStyle = lGrad;
-      c.shadowColor = '#F59E0B';
-      c.shadowBlur = 10;
-      c.fill();
-
-      c.restore();
-    };
-
-    // Helper: Draw Corporate Geometric Prism
-    const drawPrism = (
-      c: CanvasRenderingContext2D,
-      px: number,
-      py: number,
-      size: number,
-      angle: number,
-      alpha: number
-    ) => {
-      c.save();
-      c.translate(px, py);
-      c.rotate(angle);
-      c.globalAlpha = Math.max(0, Math.min(1, alpha));
-
-      c.beginPath();
-      c.moveTo(0, -size);
-      c.lineTo(size * 0.86, size * 0.5);
-      c.lineTo(-size * 0.86, size * 0.5);
-      c.closePath();
-
-      c.strokeStyle = 'rgba(56, 189, 248, 0.75)';
-      c.lineWidth = 2;
-      c.fillStyle = 'rgba(15, 23, 42, 0.4)';
-      c.shadowColor = '#38BDF8';
       c.shadowBlur = 12;
       c.fill();
-      c.stroke();
+
       c.restore();
     };
 
-    // Helper: Draw Rose / Floral Petals
-    const drawPetal = (
-      c: CanvasRenderingContext2D,
-      px: number,
-      py: number,
-      size: number,
-      rot: number,
-      alpha: number,
-      color: string
-    ) => {
-      c.save();
-      c.translate(px, py);
-      c.rotate(rot);
-      c.globalAlpha = Math.max(0, Math.min(1, alpha));
-
-      c.beginPath();
-      c.moveTo(0, -size);
-      c.bezierCurveTo(-size * 0.8, -size * 0.6, -size * 0.9, size * 0.4, 0, size);
-      c.bezierCurveTo(size * 0.9, size * 0.4, size * 0.8, -size * 0.6, 0, -size);
-      c.closePath();
-
-      c.fillStyle = color;
-      c.shadowColor = color;
-      c.shadowBlur = 6;
-      c.fill();
-      c.restore();
-    };
-
-    // Generate Dynamic Floating Elements based on category
+    // Initialize 3D Floating Elements
+    const elementCount = isMobile ? 18 : 34;
     const elements: FloatingElement[] = [];
 
-    if (category === 'WEDDING' || category === 'ROMANCE') {
-      // Large Hearts on sides
-      elements.push(
-        {
-          type: 'heart',
-          x: width * 0.12,
-          y: height * 0.28,
-          baseY: height * 0.28,
-          size: isMobile ? 65 : 105,
-          angle: -0.18,
-          vRot: 0.003,
-          vx: 0.08,
-          vy: -0.15,
-          alpha: 0.78,
-          layer: 'fg',
-          colorGrad: ['rgba(201, 92, 120, 0.45)', 'rgba(100, 21, 47, 0.75)'],
-          strokeColor: 'rgba(240, 215, 164, 0.85)',
-          swayFreq: 0.012,
-          swayAmp: 18,
-        },
-        {
-          type: 'heart',
-          x: width * 0.88,
-          y: height * 0.35,
-          baseY: height * 0.35,
-          size: isMobile ? 60 : 95,
-          angle: 0.22,
-          vRot: -0.0025,
-          vx: -0.07,
-          vy: -0.12,
-          alpha: 0.72,
-          layer: 'fg',
-          colorGrad: ['rgba(214, 170, 97, 0.45)', 'rgba(122, 31, 61, 0.75)'],
-          strokeColor: 'rgba(255, 248, 239, 0.85)',
-          swayFreq: 0.014,
-          swayAmp: 15,
-        },
-        {
-          type: 'glass',
-          x: width * 0.08,
-          y: height * 0.48,
-          baseY: height * 0.48,
-          size: 0,
-          width: isMobile ? 42 : 65,
-          height: isMobile ? 85 : 135,
-          angle: 0.18,
-          vRot: 0.0015,
-          vx: 0.04,
-          vy: -0.08,
-          alpha: 0.75,
-          layer: 'fg',
-          colorGrad: ['rgba(214, 170, 97, 0.85)', 'rgba(53, 13, 29, 0.95)'],
-          strokeColor: '#D6AA61',
-          swayFreq: 0.009,
-          swayAmp: 12,
-        },
-        {
-          type: 'glass',
-          x: width * 0.92,
-          y: height * 0.52,
-          baseY: height * 0.52,
-          size: 0,
-          width: isMobile ? 46 : 72,
-          height: isMobile ? 80 : 130,
-          angle: -0.15,
-          vRot: -0.0015,
-          vx: -0.04,
-          vy: -0.07,
-          alpha: 0.72,
-          layer: 'fg',
-          colorGrad: ['rgba(122, 31, 61, 0.9)', 'rgba(53, 13, 29, 0.95)'],
-          strokeColor: '#7A1F3D',
-          swayFreq: 0.008,
-          swayAmp: 10,
-        }
-      );
-    } else if (category === 'BIRTHDAY') {
-      // Large Floating Celebration Stars & Confetti
-      elements.push(
-        {
-          type: 'star',
-          x: width * 0.15,
-          y: height * 0.25,
-          baseY: height * 0.25,
-          size: isMobile ? 45 : 75,
-          angle: 0,
-          vRot: 0.008,
-          vx: 0.06,
-          vy: -0.14,
-          alpha: 0.85,
-          layer: 'fg',
-          colorGrad: ['#F59E0B', '#D97706'],
-          strokeColor: '#FDE68A',
-          swayFreq: 0.012,
-          swayAmp: 15,
-        },
-        {
-          type: 'star',
-          x: width * 0.85,
-          y: height * 0.38,
-          baseY: height * 0.38,
-          size: isMobile ? 40 : 68,
-          angle: 0.2,
-          vRot: -0.007,
-          vx: -0.06,
-          vy: -0.12,
-          alpha: 0.8,
-          layer: 'fg',
-          colorGrad: ['#EC4899', '#BE185D'],
-          strokeColor: '#FBCFE8',
-          swayFreq: 0.014,
-          swayAmp: 14,
-        },
-        {
-          type: 'star',
-          x: width * 0.25,
-          y: height * 0.75,
-          baseY: height * 0.75,
-          size: isMobile ? 32 : 52,
-          angle: -0.1,
-          vRot: 0.006,
-          vx: 0.04,
-          vy: -0.1,
-          alpha: 0.65,
-          layer: 'mid',
-          colorGrad: ['#8B5CF6', '#6D28D9'],
-          strokeColor: '#DDD6FE',
-          swayFreq: 0.016,
-          swayAmp: 10,
-        }
-      );
-    } else if (category === 'BABY_SACRED' || category === 'DEVOTIONAL') {
-      // Sacred Lotus Blossoms & Auspicious Motifs
-      elements.push(
-        {
-          type: 'lotus',
-          x: width * 0.14,
-          y: height * 0.3,
-          baseY: height * 0.3,
-          size: isMobile ? 38 : 62,
-          angle: -0.1,
-          vRot: 0.003,
-          vx: 0.05,
-          vy: -0.12,
-          alpha: 0.82,
-          layer: 'fg',
-          colorGrad: ['#F59E0B', '#B45309'],
-          strokeColor: '#FEF3C7',
-          swayFreq: 0.01,
-          swayAmp: 14,
-        },
-        {
-          type: 'lotus',
-          x: width * 0.86,
-          y: height * 0.4,
-          baseY: height * 0.4,
-          size: isMobile ? 35 : 58,
-          angle: 0.15,
-          vRot: -0.003,
-          vx: -0.05,
-          vy: -0.11,
-          alpha: 0.78,
-          layer: 'fg',
-          colorGrad: ['#EC4899', '#BE185D'],
-          strokeColor: '#FDE68A',
-          swayFreq: 0.012,
-          swayAmp: 12,
-        }
-      );
-    } else if (category === 'CORPORATE') {
-      // Clean Geometric Prisms & Platinum Nodes
-      elements.push(
-        {
-          type: 'prism',
-          x: width * 0.12,
-          y: height * 0.32,
-          baseY: height * 0.32,
-          size: isMobile ? 40 : 65,
-          angle: 0.1,
-          vRot: 0.002,
-          vx: 0.04,
-          vy: -0.08,
-          alpha: 0.75,
-          layer: 'fg',
-          colorGrad: ['#0EA5E9', '#0369A1'],
-          strokeColor: '#38BDF8',
-          swayFreq: 0.008,
-          swayAmp: 10,
-        },
-        {
-          type: 'prism',
-          x: width * 0.88,
-          y: height * 0.42,
-          baseY: height * 0.42,
-          size: isMobile ? 36 : 58,
-          angle: -0.12,
-          vRot: -0.002,
-          vx: -0.04,
-          vy: -0.07,
-          alpha: 0.7,
-          layer: 'fg',
-          colorGrad: ['#38BDF8', '#0284C7'],
-          strokeColor: '#BAE6FD',
-          swayFreq: 0.009,
-          swayAmp: 9,
-        }
-      );
-    }
+    const heartPalettes: [string, string][] = [
+      ['rgba(244, 63, 94, 0.75)', 'rgba(136, 19, 55, 0.85)'], // Rose Red
+      ['rgba(251, 113, 133, 0.7)', 'rgba(190, 18, 60, 0.8)'], // Blush
+      ['rgba(245, 158, 11, 0.8)', 'rgba(180, 83, 9, 0.85)'], // Royal Amber Gold
+      ['rgba(236, 72, 153, 0.7)', 'rgba(157, 23, 77, 0.8)'], // Fuchsia Romantic
+    ];
 
-    // Floating Petals / Small Sparkles
-    const petalCount = isMobile ? 12 : 20;
-    const petals: Array<{ x: number; y: number; size: number; rot: number; vRot: number; vx: number; vy: number; alpha: number; layer: 'fg' | 'mid'; color: string }> = [];
-    const petalColor = category === 'BIRTHDAY' ? '#F59E0B' : category === 'BABY_SACRED' || category === 'DEVOTIONAL' ? '#E68A00' : category === 'CORPORATE' ? '#38BDF8' : '#C95C78';
+    const types: FloatingElement['type'][] = [
+      'heart',
+      'heart',
+      'heart',
+      'glass',
+      'rings',
+      'petal',
+      'petal',
+      'star',
+      'bokeh',
+    ];
 
-    for (let i = 0; i < petalCount; i++) {
-      petals.push({
+    for (let i = 0; i < elementCount; i++) {
+      const layer: 'bg' | 'mid' | 'fg' = i % 3 === 0 ? 'bg' : i % 3 === 1 ? 'mid' : 'fg';
+      const type = types[i % types.length];
+      const pal = heartPalettes[i % heartPalettes.length];
+
+      const size =
+        layer === 'bg'
+          ? Math.random() * 25 + 45
+          : layer === 'mid'
+          ? Math.random() * 20 + 25
+          : Math.random() * 15 + 14;
+
+      elements.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        size: Math.random() * 8 + (isMobile ? 10 : 16),
-        rot: Math.random() * Math.PI * 2,
+        baseY: Math.random() * height,
+        size,
+        width: size * (type === 'glass' ? 0.7 : 1),
+        height: size * (type === 'glass' ? 1.6 : 1),
+        angle: Math.random() * Math.PI * 2,
         vRot: (Math.random() - 0.5) * 0.015,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: -(Math.random() * 0.35 + 0.12),
-        alpha: Math.random() * 0.4 + 0.35,
-        layer: i % 2 === 0 ? 'fg' : 'mid',
-        color: petalColor,
+        vx: (Math.random() - 0.5) * (layer === 'fg' ? 0.4 : 0.2),
+        vy: -(Math.random() * (layer === 'fg' ? 0.6 : 0.3) + 0.2),
+        alpha: layer === 'bg' ? 0.35 : layer === 'mid' ? 0.65 : 0.85,
+        layer,
+        colorGrad: pal,
+        strokeColor: 'rgba(255, 215, 0, 0.6)',
+        swayFreq: Math.random() * 0.02 + 0.01,
+        swayAmp: Math.random() * 20 + 10,
+        type,
       });
     }
 
-    // Golden Sparkle Dust Particles
-    const particleCount = isMobile ? 20 : 40;
+    // Initialize Golden Stardust Particles
+    const particleCount = isMobile ? 35 : 75;
     const particles: Particle[] = [];
-    const pColors = category === 'CORPORATE' ? ['#38BDF8', '#BAE6FD', '#FFFFFF'] : ['#D6AA61', '#F0D7A4', '#C95C78', '#FFF8EF'];
+    const particleColors = ['#F59E0B', '#FBBF24', '#FEF3C7', '#FDA4AF', '#FFFFFF', '#38BDF8'];
 
     for (let i = 0; i < particleCount; i++) {
       particles.push({
         x: Math.random() * width,
         y: Math.random() * height,
-        radius: Math.random() * 2.5 + 0.8,
-        color: pColors[i % pColors.length],
-        vx: (Math.random() - 0.5) * 0.2,
-        vy: -(Math.random() * 0.28 + 0.08),
-        alpha: Math.random() * 0.65 + 0.25,
-        layer: i % 3 === 0 ? 'fg' : i % 3 === 1 ? 'mid' : 'bg',
+        radius: Math.random() * 2.2 + 0.8,
+        color: particleColors[Math.floor(Math.random() * particleColors.length)],
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: -(Math.random() * 0.4 + 0.1),
+        alpha: Math.random() * 0.7 + 0.3,
+        pulseSpeed: Math.random() * 0.03 + 0.01,
+        pulsePhase: Math.random() * Math.PI * 2,
+        layer: i % 2 === 0 ? 'bg' : 'fg',
       });
     }
 
     let time = 0;
 
+    // 60FPS Main Animation Render Loop
     const render = () => {
-      time += 1;
-      ctx.clearRect(0, 0, width, height);
+      time += 0.016;
+
+      // Mouse Parallax Easing
+      mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.05;
+      mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.05;
+      const mouseOffsetX = (mouseRef.current.x - 0.5) * 40;
+      const mouseOffsetY = (mouseRef.current.y - 0.5) * 30;
 
       const scrollY = scrollYRef.current;
-      const bgParallax = scrollY * 0.08;
-      const midParallax = scrollY * 0.22;
-      const fgParallax = scrollY * 0.42;
 
-      // 1. Draw Floating Category Elements
-      for (const el of elements) {
-        const parallax = el.layer === 'fg' ? fgParallax : el.layer === 'mid' ? midParallax : bgParallax;
-        el.angle += el.vRot;
-        const currentX = el.x + Math.sin(time * el.swayFreq) * el.swayAmp;
-        const currentY = ((el.baseY - parallax + (time * el.vy)) % (height + 160) + (height + 160)) % (height + 160) - 80;
+      // Clear Canvas
+      ctx.clearRect(0, 0, width, height);
 
-        if (el.type === 'heart') {
-          drawHeart(ctx, currentX, currentY, el.size, el.angle, el.alpha, el.colorGrad, el.strokeColor);
-        } else if (el.type === 'glass') {
-          drawWineGlass(ctx, currentX, currentY, el.width || 60, el.height || 120, el.angle, el.alpha, true, el.colorGrad[0]);
-        } else if (el.type === 'star') {
-          drawStar(ctx, currentX, currentY, 5, el.size, el.size * 0.45, el.angle, el.alpha, el.colorGrad[0]);
-        } else if (el.type === 'lotus') {
-          drawLotus(ctx, currentX, currentY, el.size, el.angle, el.alpha);
-        } else if (el.type === 'prism') {
-          drawPrism(ctx, currentX, currentY, el.size, el.angle, el.alpha);
-        }
-      }
+      // 1. Deep Atmospheric Gradient Background
+      const bgGrad = ctx.createRadialGradient(
+        width * 0.5 + mouseOffsetX * 0.3,
+        height * 0.35 + mouseOffsetY * 0.3,
+        width * 0.1,
+        width * 0.5,
+        height * 0.5,
+        Math.max(width, height) * 0.85
+      );
 
-      // 2. Draw Petals
-      for (const pt of petals) {
-        const parallax = pt.layer === 'fg' ? fgParallax : midParallax;
-        pt.rot += pt.vRot;
-        pt.x += pt.vx + Math.sin(time * 0.015) * 0.4;
-        pt.y += pt.vy;
-        if (pt.y < -30) pt.y = height + 30;
-        const py = ((pt.y - parallax) % (height + 60) + (height + 60)) % (height + 60) - 30;
-        drawPetal(ctx, pt.x, py, pt.size, pt.rot, pt.alpha, pt.color);
-      }
+      bgGrad.addColorStop(0, '#2D0A14'); // Romantic Wine / Velvet Core
+      bgGrad.addColorStop(0.45, '#19040A');
+      bgGrad.addColorStop(0.8, '#0F0206');
+      bgGrad.addColorStop(1, '#050103');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, width, height);
 
-      // 3. Draw Sparkles / Dust
-      for (const p of particles) {
-        const parallax = p.layer === 'fg' ? fgParallax : p.layer === 'mid' ? midParallax : bgParallax;
-        p.x += p.vx;
+      // 2. Cosmic Ambient Aurora Glow Centers
+      const aura1 = ctx.createRadialGradient(
+        width * 0.2 + mouseOffsetX * 0.5,
+        height * 0.7 - scrollY * 0.05,
+        10,
+        width * 0.2,
+        height * 0.7,
+        width * 0.4
+      );
+      aura1.addColorStop(0, 'rgba(244, 63, 94, 0.18)');
+      aura1.addColorStop(1, 'transparent');
+      ctx.fillStyle = aura1;
+      ctx.fillRect(0, 0, width, height);
+
+      const aura2 = ctx.createRadialGradient(
+        width * 0.8 - mouseOffsetX * 0.5,
+        height * 0.25 - scrollY * 0.08,
+        10,
+        width * 0.8,
+        height * 0.25,
+        width * 0.45
+      );
+      aura2.addColorStop(0, 'rgba(245, 158, 11, 0.15)');
+      aura2.addColorStop(1, 'transparent');
+      ctx.fillStyle = aura2;
+      ctx.fillRect(0, 0, width, height);
+
+      // 3. Render 3D Floating Elements by Multi-Depth Layer
+      const renderLayers: ('bg' | 'mid' | 'fg')[] = ['bg', 'mid', 'fg'];
+
+      renderLayers.forEach((layer) => {
+        const parallaxFactor = layer === 'bg' ? 0.08 : layer === 'mid' ? 0.2 : 0.35;
+        const mouseFactor = layer === 'bg' ? 0.3 : layer === 'mid' ? 0.7 : 1.2;
+
+        elements
+          .filter((el) => el.layer === layer)
+          .forEach((el) => {
+            // Update Position with sinusoidal sway and upward float
+            el.y += el.vy;
+            el.angle += el.vRot;
+            const sway = Math.sin(time * el.swayFreq * 100 + el.baseY) * el.swayAmp;
+            const currentX = el.x + sway + mouseOffsetX * mouseFactor;
+            const currentY = el.y - scrollY * parallaxFactor + mouseOffsetY * mouseFactor;
+
+            // Wrap around screen boundaries smoothly
+            if (el.y < -100) {
+              el.y = height + 100;
+              el.x = Math.random() * width;
+            }
+            if (el.x < -100) el.x = width + 100;
+            if (el.x > width + 100) el.x = -100;
+
+            // Render shape by type
+            switch (el.type) {
+              case 'heart':
+                drawHeart(ctx, currentX, currentY, el.size, el.angle, el.alpha, el.colorGrad, el.strokeColor);
+                break;
+              case 'glass':
+                drawWineGlass(
+                  ctx,
+                  currentX,
+                  currentY,
+                  el.width || el.size * 0.7,
+                  el.height || el.size * 1.6,
+                  el.angle,
+                  el.alpha,
+                  true,
+                  'rgba(244, 63, 94, 0.65)'
+                );
+                break;
+              case 'rings':
+                drawInterlockingRings(ctx, currentX, currentY, el.size, el.angle, el.alpha);
+                break;
+              case 'petal':
+                drawRosePetal(ctx, currentX, currentY, el.size, el.angle, el.alpha);
+                break;
+              case 'star':
+                drawStar(ctx, currentX, currentY, el.size * 0.6, el.angle, el.alpha, '#FBBF24');
+                break;
+              case 'bokeh':
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(currentX, currentY, el.size * 0.8, 0, Math.PI * 2);
+                ctx.fillStyle = el.colorGrad[0];
+                ctx.globalAlpha = el.alpha * 0.4;
+                ctx.shadowColor = el.colorGrad[1];
+                ctx.shadowBlur = 25;
+                ctx.fill();
+                ctx.restore();
+                break;
+            }
+          });
+      });
+
+      // 4. Render Golden Stardust & Shimmering Embers
+      particles.forEach((p) => {
         p.y += p.vy;
-        if (p.y < -10) p.y = height + 10;
-        const pY = ((p.y - parallax) % (height + 20) + (height + 20)) % (height + 20) - 10;
+        p.x += p.vx;
+        p.pulsePhase += p.pulseSpeed;
+        const currentAlpha = p.alpha * (0.6 + 0.4 * Math.sin(p.pulsePhase));
+
+        if (p.y < 0) {
+          p.y = height + 10;
+          p.x = Math.random() * width;
+        }
+
+        const parallaxY = p.y - scrollY * (p.layer === 'bg' ? 0.05 : 0.25);
+
         ctx.save();
-        ctx.globalAlpha = p.alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, parallaxY, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, Math.min(1, currentAlpha));
         ctx.shadowColor = p.color;
         ctx.shadowBlur = 8;
-        ctx.beginPath();
-        ctx.arc(p.x, pY, p.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
-      }
+      });
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -654,29 +583,29 @@ export const WebGLShaderBackground: React.FC<WebGLShaderBackgroundProps> = ({ ev
     render();
 
     return () => {
-      cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animationFrameId);
     };
-  }, [eventType, category]);
-
-  const bgStyle =
-    category === 'BIRTHDAY'
-      ? 'radial-gradient(ellipse at center top, #3B1666 0%, #1E0A38 50%, #0D031A 100%)'
-      : category === 'BABY_SACRED' || category === 'DEVOTIONAL'
-      ? 'radial-gradient(ellipse at center top, #471A02 0%, #260E01 50%, #0F0500 100%)'
-      : category === 'CORPORATE'
-      ? 'radial-gradient(ellipse at center top, #0F172A 0%, #090D1A 50%, #020617 100%)'
-      : 'radial-gradient(ellipse at center top, #4A1022 0%, #2A0815 45%, #140209 80%, #080104 100%)';
+  }, [category]);
 
   if (isLowPowerMode) {
-    return <div className="fixed inset-0 pointer-events-none -z-10" style={{ background: bgStyle }} />;
+    return (
+      <div
+        className="fixed inset-0 pointer-events-none -z-10 bg-gradient-to-b from-[#2D0A14] via-[#19040A] to-[#0A0205]"
+        aria-hidden="true"
+      />
+    );
   }
 
   return (
     <canvas
       ref={canvasRef}
       className="fixed inset-0 pointer-events-none -z-10 w-full h-full"
-      style={{ background: bgStyle }}
+      style={{
+        width: '100vw',
+        height: '100vh',
+      }}
+      aria-hidden="true"
     />
   );
 };
