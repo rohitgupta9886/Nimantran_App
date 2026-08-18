@@ -7,7 +7,7 @@ from app.core.config import settings
 connect_args = {}
 db_url = settings.async_database_url
 if "sqlite" in db_url:
-    connect_args = {"check_same_thread": False}
+    connect_args = {"check_same_thread": False, "timeout": 30}
 
 engine = create_async_engine(
     db_url,

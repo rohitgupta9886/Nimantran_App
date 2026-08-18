@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Heart, Gift, Volume2, VolumeX, RotateCcw, Key, Unlock, ChevronDown, Check, Star } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, Heart, Gift, RotateCcw, Unlock, Check } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface InteractiveGiftBoxProps {
@@ -30,24 +30,23 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
   onReset,
 }) => {
   // 🎬 CINEMATIC STAGE SEQUENCE:
-  // 0 = REST (Chest closed, breathing golden aura, gentle float, anticipation)
-  // 1 = TAP_FEEDBACK (Instant scale bounce, haptic pulse, audio click)
-  // 2 = CINEMATIC_FOCUS & SPOTLIGHT (Dim surrounding backdrop, intense center glow)
-  // 3 = RIBBON_UNLOCK (Golden ribbon loosens & unlocks with glowing sparkle trail)
-  // 4 = 3D_LID_OPEN (Lid physically swings back, golden interior beam erupts)
-  // 5 = MAGICAL_BLAST ("WOW" moment: sub-bass boom + chime, golden stars + rose petals + hearts burst)
-  // 6 = CARD_EMERGENCE (Royal personalized card rises vertically from inside the open chest)
-  // 7 = REVEAL_SETTLE (Card settles into place with golden shimmer flash, unlocks full page)
-  // 8 = FULLY_OPENED (Completed state, persistent celebration mode)
+  // 0 = REST (Closed chest, breathing golden aura, gentle float, anticipation)
+  // 1 = TAP_FEEDBACK (Scale bounce, haptic pulse, audio chime)
+  // 2 = SPOTLIGHT (Dim background, intense center glow)
+  // 3 = RIBBON_UNLOCK (Golden ribbon loosens & unlocks)
+  // 4 = 3D_LID_OPEN (Lid physically swings open, golden interior beam erupts)
+  // 5 = MAGICAL_BLAST ("WOW" moment: sub-bass boom + chime, golden confetti + petals burst)
+  // 6 = CARD_EMERGENCE (Royal personalized card emerges vertically from inside chest)
+  // 7 = REVEAL_SETTLE (Card settles with golden shimmer flash)
+  // 8 = FULLY_OPENED (Completed state, celebration mode)
   const [stage, setStage] = useState<number>(isOpened ? 8 : 0);
   const [isOpening, setIsOpening] = useState<boolean>(false);
   const [isHovered, setIsHovered] = useState<boolean>(false);
 
-  // Floating floating petals and hearts particle state
+  // Floating petals and glowing sparkles particle state
   const [floatingPetals, setFloatingPetals] = useState<Array<{ id: number; left: number; delay: number; size: number; duration: number }>>([]);
   const [floatingHearts, setFloatingHearts] = useState<Array<{ id: number; left: number; delay: number; size: number; duration: number }>>([]);
 
-  // Sync external isOpened state
   useEffect(() => {
     if (isOpened) {
       setStage(8);
@@ -57,27 +56,26 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
     }
   }, [isOpened]);
 
-  // Generate controlled romantic floating petals and hearts
   useEffect(() => {
-    const petals = Array.from({ length: 14 }, (_, i) => ({
+    const petals = Array.from({ length: 16 }, (_, i) => ({
       id: i,
       left: Math.random() * 90 + 5,
       delay: Math.random() * 1.5,
-      size: Math.random() * 10 + 14,
+      size: Math.random() * 10 + 16,
       duration: Math.random() * 1.5 + 2.5,
     }));
-    const hearts = Array.from({ length: 8 }, (_, i) => ({
+    const hearts = Array.from({ length: 10 }, (_, i) => ({
       id: i,
       left: Math.random() * 80 + 10,
-      delay: Math.random() * 1.2 + 0.3,
-      size: Math.random() * 8 + 12,
+      delay: Math.random() * 1.2 + 0.2,
+      size: Math.random() * 8 + 14,
       duration: Math.random() * 1.5 + 2.0,
     }));
     setFloatingPetals(petals);
     setFloatingHearts(hearts);
   }, []);
 
-  // Synthesize rich Web Audio Chime & Sub-Bass Impact Boom (Zero external asset latency)
+  // Web Audio Chime & Sub-Bass Impact Boom (Zero external asset latency)
   const playCinematicAudio = () => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -102,7 +100,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
       tapOsc.start();
       tapOsc.stop(ctx.currentTime + 0.15);
 
-      // 2. Sub-bass resonant impact boom for the "BLAST" moment + Grand Haptic Pulse
+      // 2. Sub-bass resonant impact boom for the "BLAST" moment + Haptic Pulse
       setTimeout(() => {
         try {
           if (typeof window !== 'undefined' && 'vibrate' in navigator) {
@@ -123,7 +121,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
           oscBoom.start();
           oscBoom.stop(ctx.currentTime + 1.8);
 
-          // 3. C-Major Pentatonic Shimmering Chime Sweep
+          // 3. Pentatonic Shimmering Chime Sweep
           const chimeFreqs = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
           chimeFreqs.forEach((freq, idx) => {
             const osc = ctx.createOscillator();
@@ -144,35 +142,33 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
     }
   };
 
-  // Trigger high-performance luxury canvas confetti celebration
+  // High-performance luxury canvas confetti celebration
   const triggerLuxuryBurst = () => {
     try {
-      // Golden star and rose champagne burst
       confetti({
-        particleCount: 140,
-        spread: 110,
+        particleCount: 120,
+        spread: 100,
         origin: { y: 0.55 },
-        colors: ['#FFD700', '#FFA500', '#FFE4B5', '#FFF8DC', '#FF69B4', '#D4AF37', '#E5C07B'],
+        colors: ['#D4AF37', '#C89B5A', '#E8CFA7', '#6E2035', '#FFFFFF', '#FF69B4'],
         shapes: ['circle', 'star'],
-        scalar: 1.25,
-        ticks: 280,
+        scalar: 1.2,
+        ticks: 260,
       });
 
-      // Lateral celebratory flare cannons
       setTimeout(() => {
         confetti({
-          particleCount: 60,
-          angle: 55,
-          spread: 60,
+          particleCount: 50,
+          angle: 60,
+          spread: 55,
           origin: { x: 0.05, y: 0.65 },
-          colors: ['#FFD700', '#FF8C00', '#FFB6C1', '#FFF'],
+          colors: ['#D4AF37', '#C89B5A', '#FFFFFF'],
         });
         confetti({
-          particleCount: 60,
-          angle: 125,
-          spread: 60,
+          particleCount: 50,
+          angle: 120,
+          spread: 55,
           origin: { x: 0.95, y: 0.65 },
-          colors: ['#FFD700', '#FF8C00', '#FFB6C1', '#FFF'],
+          colors: ['#D4AF37', '#C89B5A', '#FFFFFF'],
         });
       }, 200);
     } catch (e) {
@@ -180,24 +176,13 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
     }
   };
 
-  // Trigger Safe Haptic Vibration
-  const triggerHaptic = () => {
-    try {
-      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-        navigator.vibrate([40, 50, 40]);
-      }
-    } catch (e) {}
-  };
-
-  // 🎬 MAIN CINEMATIC UNWRAP SEQUENCE
   const handleOpenGift = () => {
     if (stage > 0 || isOpening) return;
     setIsOpening(true);
-    triggerHaptic();
     playCinematicAudio();
 
-    // Check for reduced motion preference
-    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReducedMotion =
+      typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) {
       triggerLuxuryBurst();
@@ -225,7 +210,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
       setStage(4);
     }, 850);
 
-    // 1.25s: Stage 5 - MAGICAL "WOW" BURST (confetti, petals, hearts, boom sound)
+    // 1.25s: Stage 5 - MAGICAL "WOW" BURST
     setTimeout(() => {
       setStage(5);
       triggerLuxuryBurst();
@@ -241,7 +226,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
       setStage(7);
     }, 2450);
 
-    // 2.85s: Stage 8 - Fully opened, seamlessly transfer to hero section
+    // 2.85s: Stage 8 - Fully opened, seamlessly transfer to celebration view
     setTimeout(() => {
       setStage(8);
       setIsOpening(false);
@@ -249,7 +234,6 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
     }, 2850);
   };
 
-  // Skip option so guests are never blocked
   const handleSkip = (e: React.MouseEvent) => {
     e.stopPropagation();
     triggerLuxuryBurst();
@@ -258,7 +242,6 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
     if (onOpenComplete) onOpenComplete();
   };
 
-  // Replay option
   const handleReclose = (e: React.MouseEvent) => {
     e.stopPropagation();
     setStage(0);
@@ -269,15 +252,14 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
   return (
     <div className="relative w-full flex flex-col items-center justify-center my-2 sm:my-4 z-20 select-none">
       
-      {/* 🌟 1. CINEMATIC FULLSCREEN DIMMING & SPOTLIGHT (DURING STAGES 2 TO 6) 🌟 */}
+      {/* 🌟 1. CINEMATIC FULLSCREEN DIMMING & SPOTLIGHT (STAGES 2 TO 6) 🌟 */}
       {stage >= 2 && stage < 8 && (
         <div className="fixed inset-0 bg-black/65 backdrop-blur-[2px] pointer-events-none z-30 transition-opacity duration-700 animate-in fade-in" />
       )}
 
-      {/* 🌟 2. FLOATING ROSE PETALS & HEARTS LAYER (DURING MAGICAL BURST STAGES 5 TO 7) 🌟 */}
+      {/* 🌟 2. FLOATING ROSE PETALS & HEARTS LAYER (STAGES 5 TO 7) 🌟 */}
       {stage >= 5 && stage < 8 && (
         <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden">
-          {/* Drifting Rose Petals */}
           {floatingPetals.map((p) => (
             <div
               key={`petal-${p.id}`}
@@ -295,7 +277,6 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
             </div>
           ))}
 
-          {/* Ascending Glowing Hearts */}
           {floatingHearts.map((h) => (
             <div
               key={`heart-${h.id}`}
@@ -315,7 +296,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
         </div>
       )}
 
-      {/* 🌟 3. UNOPENED OR IN-PROGRESS GIFT BOX STATE (STAGE 0 to 7) 🌟 */}
+      {/* 🌟 3. UNOPENED OR IN-PROGRESS GIFT BOX STATE (STAGES 0 to 7) 🌟 */}
       {stage < 8 && (
         <div 
           className={`w-full max-w-sm sm:max-w-md mx-auto text-center space-y-3 sm:space-y-4 px-2 relative z-40 transition-transform duration-500 ${
@@ -325,12 +306,12 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
           
           {/* Header Curiosity / Personalized Salutation */}
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/25 via-rose-500/25 to-amber-500/25 border border-amber-300/70 shadow-[0_0_20px_rgba(255,215,0,0.4)] backdrop-blur-md">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-rose-500/20 to-amber-500/20 border border-amber-300/60 shadow-[0_0_20px_rgba(200,155,90,0.3)] backdrop-blur-md">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
               <span className="text-[11px] sm:text-xs font-serif font-extrabold uppercase tracking-widest text-amber-200">
                 {guestName ? `A Special Gift For ${guestName}` : 'A Special Invitation Awaits You'}
               </span>
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
             </div>
             
             {salutation && (
@@ -358,8 +339,8 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
               className="absolute inset-0 rounded-full blur-2xl pointer-events-none transition-all duration-700 -z-10"
               style={{
                 background: stage >= 4 
-                  ? 'radial-gradient(circle, rgba(255, 215, 0, 0.7) 0%, rgba(225, 29, 72, 0.5) 45%, transparent 75%)'
-                  : 'radial-gradient(circle, rgba(255, 215, 0, 0.45) 0%, rgba(126, 34, 59, 0.35) 50%, transparent 75%)',
+                  ? 'radial-gradient(circle, rgba(212, 175, 55, 0.7) 0%, rgba(110, 32, 53, 0.5) 45%, transparent 75%)'
+                  : 'radial-gradient(circle, rgba(200, 155, 90, 0.45) 0%, rgba(110, 32, 53, 0.35) 50%, transparent 75%)',
                 opacity: stage >= 2 ? 1.0 : isHovered ? 0.85 : 0.6,
                 transform: stage >= 4 ? 'scale(1.4)' : stage >= 2 ? 'scale(1.2)' : 'scale(1.0)',
               }}
@@ -371,16 +352,16 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
             {/* 3D OPENING LID STRUCTURE (STAGE >= 4) */}
             {stage >= 4 && (
               <div 
-                className="absolute -top-9 sm:-top-11 w-[84%] h-22 sm:h-26 rounded-t-3xl border-t-2 border-x-2 border-amber-300 shadow-[0_-20px_40px_rgba(255,215,0,0.6)] z-40 bg-gradient-to-r from-[#A74960] via-[#893148] to-[#5E000F] flex flex-col items-center justify-center p-2 transition-all duration-700 animate-in fade-in"
+                className="absolute -top-9 sm:-top-11 w-[84%] h-22 sm:h-26 rounded-t-3xl border-t-2 border-x-2 border-amber-300 shadow-[0_-20px_40px_rgba(212,175,55,0.6)] z-40 bg-gradient-to-r from-[#8B263E] via-[#6E2035] to-[#3A1420] flex flex-col items-center justify-center p-2 transition-all duration-700 animate-in fade-in"
                 style={{
                   transform: 'perspective(700px) rotateX(-60deg) translateY(-12px)',
                   transformOrigin: 'top center',
-                  boxShadow: '0 -15px 35px rgba(255,215,0,0.5), inset 0 2px 15px rgba(255,255,255,0.4)',
+                  boxShadow: '0 -15px 35px rgba(212,175,55,0.5), inset 0 2px 15px rgba(255,255,255,0.4)',
                 }}
               >
                 <div className="flex items-center gap-1.5 text-amber-300 font-serif text-xs font-bold tracking-wider">
                   <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                  <span>CHEST UNLOCKED</span>
+                  <span>INVITATION UNLOCKED</span>
                   <Sparkles className="w-3.5 h-3.5 animate-spin" />
                 </div>
               </div>
@@ -392,7 +373,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
                 <div
                   className="w-64 sm:w-72 h-44 rounded-full blur-2xl animate-pulse"
                   style={{
-                    background: 'radial-gradient(circle, #FFF7CC 0%, #FFD700 45%, rgba(225,29,72,0.4) 75%, transparent 100%)',
+                    background: 'radial-gradient(circle, #FFF7CC 0%, #D4AF37 45%, rgba(110,32,53,0.4) 75%, transparent 100%)',
                   }}
                 />
               </div>
@@ -402,7 +383,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
             <div className="relative rounded-2xl overflow-hidden border-2 border-amber-400/60 shadow-[0_20px_60px_rgba(0,0,0,0.9)] group-hover:border-amber-300 transition-all duration-500">
               <img
                 src="/velvet_invitation_chest.jpg"
-                alt="Personalized 3D Velvet Invitation Gift Chest"
+                alt="Personalized Velvet Invitation Gift Chest"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src = '/romantic_3d_invitation_hero.jpg';
                 }}
@@ -416,7 +397,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
                 loading="eager"
               />
 
-              {/* STAGE 3: GOLDEN RIBBON UNLOCK PULSE & SLIDE */}
+              {/* STAGE 3: GOLDEN RIBBON UNLOCK PULSE */}
               {stage === 3 && (
                 <div className="absolute inset-0 bg-amber-400/35 backdrop-blur-[1px] flex items-center justify-center animate-pulse z-30">
                   <div className="px-5 py-2.5 rounded-full bg-black/90 border-2 border-amber-300 text-amber-300 text-xs font-serif font-extrabold flex items-center gap-2.5 shadow-2xl animate-in zoom-in-90 duration-300">
@@ -432,8 +413,8 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
                   <div 
                     className="p-4 sm:p-5 rounded-2xl border-2 border-amber-300 text-center shadow-[0_20px_50px_rgba(0,0,0,0.95)] space-y-1.5 backdrop-blur-xl"
                     style={{
-                      background: 'linear-gradient(135deg, #1E1B4B 0%, #0F172A 100%)',
-                      boxShadow: '0 15px 40px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,215,0,0.5)',
+                      background: 'linear-gradient(135deg, #3A1420 0%, #1A080E 100%)',
+                      boxShadow: '0 15px 40px rgba(0,0,0,0.9), inset 0 1px 0 rgba(212,175,55,0.5)',
                     }}
                   >
                     <div className="text-2xl animate-bounce">👑</div>
@@ -441,7 +422,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
                       {coupleNames || eventTitle}
                     </h4>
                     <p className="text-[11px] font-mono font-bold text-amber-300 tracking-wider uppercase animate-pulse">
-                      ✨ Unveiling Royal Invitation Pass ✨
+                      ✨ Unveiling Royal Invitation ✨
                     </p>
                   </div>
                 </div>
@@ -465,9 +446,9 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
               type="button"
               onClick={handleOpenGift}
               disabled={isOpening}
-              className="w-full sm:w-auto px-9 py-4 rounded-full font-serif font-extrabold text-xs sm:text-sm tracking-wider uppercase text-white shadow-[0_12px_35px_rgba(218,165,32,0.45)] flex items-center justify-center gap-2.5 mx-auto border-2 border-amber-300 transition-all duration-300 hover:scale-105 active:scale-95 group overflow-hidden relative"
+              className="w-full sm:w-auto px-9 py-4 rounded-full font-serif font-extrabold text-xs sm:text-sm tracking-wider uppercase text-white shadow-[0_12px_35px_rgba(200,155,90,0.4)] flex items-center justify-center gap-2.5 mx-auto border-2 border-amber-300 transition-all duration-300 hover:scale-105 active:scale-95 group overflow-hidden relative"
               style={{
-                background: 'linear-gradient(135deg, #7E223B 0%, #63182C 50%, #3B0E1B 100%)',
+                background: 'linear-gradient(135deg, #6E2035 0%, #521626 50%, #3A1420 100%)',
               }}
             >
               {/* Shimmer sweep animation */}
@@ -475,7 +456,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
               
               <Gift className="w-4 h-4 text-amber-300 animate-bounce" />
               <span className="drop-shadow-md text-amber-200 font-extrabold tracking-widest">
-                {isOpening ? 'OPENING INVITATION GIFT...' : 'TAP TO OPEN YOUR INVITATION GIFT'}
+                {isOpening ? 'OPENING INVITATION GIFT...' : 'TAP TO OPEN YOUR INVITATION'}
               </span>
               <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
             </button>
@@ -500,7 +481,6 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
       {/* 🌟 4. REVEALED CELEBRATION BADGE & RE-CLOSE / RE-OPEN OPTION (STAGE 8) 🌟 */}
       {stage === 8 && (
         <div className="w-full max-w-xl mx-auto text-center space-y-2 animate-in zoom-in-95 fade-in duration-700 px-2">
-          {/* Re-close & Re-open Action Bar */}
           <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-black/50 border border-amber-400/40 backdrop-blur-md text-xs font-mono text-amber-300 shadow-lg">
             <span className="flex items-center gap-1.5 font-bold text-[11px] sm:text-xs">
               <Check className="w-4 h-4 text-emerald-400" />
@@ -520,7 +500,7 @@ export const InteractiveGiftBox: React.FC<InteractiveGiftBoxProps> = ({
         </div>
       )}
 
-      {/* Global CSS keyframes for floating petals and hearts */}
+      {/* Keyframe animations */}
       <style>{`
         @keyframes floatPetal {
           0% {

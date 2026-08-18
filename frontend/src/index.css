@@ -51,6 +51,20 @@
   --shadow-md: 0 6px 18px rgba(31, 27, 24, 0.06), 0 1px 3px rgba(31, 27, 24, 0.03);
   --shadow-lg: 0 14px 34px rgba(31, 27, 24, 0.08), 0 2px 6px rgba(31, 27, 24, 0.04);
   --shadow-xl: 0 24px 50px rgba(31, 27, 24, 0.12), 0 4px 12px rgba(31, 27, 24, 0.06);
+
+  /* World-Class Guest Invitation Theme Tokens */
+  --inv-bg: #F8F1E7;
+  --inv-surface: #FFFDF9;
+  --inv-primary: #6E2035;
+  --inv-primary-deep: #3A1420;
+  --inv-accent: #C89B5A;
+  --inv-gold: #D4AF37;
+  --inv-highlight: #E8CFA7;
+  --inv-text: #2B2220;
+  --inv-muted: #806F68;
+  --inv-border: #E5D5C5;
+  --inv-glow: rgba(200, 155, 90, 0.35);
+  --inv-overlay: rgba(58, 20, 32, 0.85);
 }
 
 @layer base {
