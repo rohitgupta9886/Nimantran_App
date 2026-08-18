@@ -131,12 +131,10 @@ class EventService:
                     except ValueError:
                         pass
                 setattr(event, field, value)
-        if "title" in data and event.invitation:
-            event.invitation.title_text = data["title"]
-
+        evt_id = event.id
         await db.commit()
         db.expire_all()
-        return await EventService.get_event_by_id(db, event.id)
+        return await EventService.get_event_by_id(db, evt_id)
 
 
 

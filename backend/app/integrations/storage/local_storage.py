@@ -1,8 +1,13 @@
 import os
 import uuid
-import aiofiles
+import asyncio
 from app.core.config import settings
 from app.integrations.storage.base import StorageProvider
+
+
+def _write_file_sync(path: str, data: bytes):
+    with open(path, "wb") as f:
+        f.write(data)
 
 
 class LocalStorageProvider(StorageProvider):
@@ -17,8 +22,7 @@ class LocalStorageProvider(StorageProvider):
         unique_name = f"{uuid.uuid4().hex}{ext}"
         target_path = os.path.join(self.upload_dir, unique_name)
         
-        async with aiofiles.open(target_path, "wb") as f:
-            await f.write(file_bytes)
+        await asyncio.to_thread(_write_file_sync, target_path, file_bytes)
             
         return f"{settings.PUBLIC_BASE_URL}/uploads/{unique_name}"
 

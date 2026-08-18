@@ -369,6 +369,95 @@ class AIService:
         await db.commit()
         return stories
 
+    async def generate_celebration_story(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        event_id: str,
+        event_facts: Dict[str, Any],
+        approved_wishes: List[Dict[str, Any]],
+        approved_memories: List[Dict[str, Any]],
+        attendance_summary: Dict[str, Any],
+        style: str = "EMOTIONAL_ROYAL",
+    ) -> Dict[str, Any]:
+        credit_cost = 5
+        await CreditService.deduct_credits(
+            db, user_id, credit_cost, f"AI Celebration Story Generation ({event_facts.get('event_type', 'EVENT')})", TransactionType.CONSUMPTION
+        )
+
+        story_result = await self.provider.generate_celebration_story(
+            event_facts, approved_wishes, approved_memories, attendance_summary, style
+        )
+
+        usage = AIUsage(
+            user_id=user_id,
+            event_id=event_id,
+            operation_type="CELEBRATION_STORY",
+            provider_name=self.provider_name,
+            credits_deducted=credit_cost,
+            status="SUCCESS",
+        )
+        db.add(usage)
+        await db.commit()
+        return story_result
+
+    async def generate_memory_caption(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        event_id: str,
+        event_type: str,
+        milestone_or_tag: str = "Celebration Moment",
+        guest_name: Optional[str] = None,
+    ) -> Dict[str, str]:
+        credit_cost = 1
+        await CreditService.deduct_credits(
+            db, user_id, credit_cost, f"AI Memory Caption Generation", TransactionType.CONSUMPTION
+        )
+
+        caption_result = await self.provider.generate_memory_caption(
+            event_type, milestone_or_tag, guest_name
+        )
+
+        usage = AIUsage(
+            user_id=user_id,
+            event_id=event_id,
+            operation_type="MEMORY_CAPTION",
+            provider_name=self.provider_name,
+            credits_deducted=credit_cost,
+            status="SUCCESS",
+        )
+        db.add(usage)
+        await db.commit()
+        return caption_result
+
+    async def generate_attendance_thank_you(
+        self,
+        db: AsyncSession,
+        user_id: str,
+        event_id: str,
+        event_facts: Dict[str, Any],
+        attendance_summary: Dict[str, Any],
+    ) -> Dict[str, str]:
+        credit_cost = 2
+        await CreditService.deduct_credits(
+            db, user_id, credit_cost, f"AI Attendance Thank-You Note", TransactionType.CONSUMPTION
+        )
+
+        thank_you_res = await self.provider.generate_attendance_thank_you(event_facts, attendance_summary)
+
+        usage = AIUsage(
+            user_id=user_id,
+            event_id=event_id,
+            operation_type="ATTENDANCE_THANK_YOU",
+            provider_name=self.provider_name,
+            credits_deducted=credit_cost,
+            status="SUCCESS",
+        )
+        db.add(usage)
+        await db.commit()
+        return thank_you_res
+
     async def generate_structured_invitation(
         self,
         db: AsyncSession,
@@ -583,3 +672,6 @@ class AIService:
             await db.commit()
 
         return card_data
+
+
+ai_service = AIService()

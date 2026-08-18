@@ -1,6 +1,3 @@
-import { toPng, toJpeg } from 'html-to-image';
-import jsPDF from 'jspdf';
-
 // Transparent 1x1 base64 image placeholder for CORS fallbacks
 const TRANSPARENT_PLACEHOLDER =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
@@ -172,6 +169,7 @@ export const downloadCardAsPng = async (element: HTMLElement, filename = 'invita
   try {
     let dataUrl = '';
     try {
+      const { toPng } = await import('html-to-image');
       dataUrl = await toPng(element, {
         quality: 1.0,
         pixelRatio: 2,
@@ -213,6 +211,7 @@ export const downloadCardAsJpeg = async (element: HTMLElement, filename = 'invit
   try {
     let dataUrl = '';
     try {
+      const { toJpeg } = await import('html-to-image');
       dataUrl = await toJpeg(element, {
         quality: 0.95,
         pixelRatio: 2,
@@ -254,6 +253,7 @@ export const downloadCardAsPdf = async (element: HTMLElement, filename = 'invita
   try {
     let dataUrl = '';
     try {
+      const { toPng } = await import('html-to-image');
       dataUrl = await toPng(element, {
         quality: 1.0,
         pixelRatio: 2,
@@ -270,6 +270,7 @@ export const downloadCardAsPdf = async (element: HTMLElement, filename = 'invita
       dataUrl = fallbackCanvas.toDataURL('image/png');
     }
 
+    const { default: jsPDF } = await import('jspdf');
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',

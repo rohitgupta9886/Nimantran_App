@@ -20,7 +20,8 @@ import { apiFetch } from '../services/api';
 interface RsvpExperienceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  eventSlug: string;
+  eventSlug?: string;
+  token?: string;
   eventTitle?: string;
   eventDate?: string;
   eventVenue?: string;
@@ -32,10 +33,11 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
   isOpen,
   onClose,
   eventSlug,
-  eventTitle = "Priyanka & Rohit's Wedding Celebration",
-  eventDate = "18 Oct 2026, 6:00 PM onwards",
-  eventVenue = "The Taj Hotel & Convention Centre, Lucknow",
-  guestName: defaultGuestName = "Rohit Gupta",
+  token,
+  eventTitle = "Celebration Invitation",
+  eventDate = "Date to be Announced",
+  eventVenue = "Celebration Venue",
+  guestName: defaultGuestName = "",
   onRsvpSuccess,
 }) => {
   // Step state: 'CHOICE' | 'FORM' | 'THANK_YOU'
@@ -46,7 +48,7 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
   const [guestNameInput, setGuestNameInput] = useState(defaultGuestName);
   const [phoneInput, setPhoneInput] = useState('');
   const [guestCount, setGuestCount] = useState<number>(2);
-  const [mealPreference, setMealPreference] = useState<'Veg (only)' | 'Non-Veg (only)' | 'Any'>('Veg (only)');
+  const [mealPreference, setMealPreference] = useState<'Veg (only)' | 'Non-Veg (only)' | 'Jain (only)' | 'Any'>('Veg (only)');
   const [specialNotes, setSpecialNotes] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
@@ -77,11 +79,15 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
   ) => {
     setSubmitting(true);
     try {
-      const res = await apiFetch<any>(`/public/events/${eventSlug}/rsvp`, {
+      const endpoint = token
+        ? `/public/invitations/t/${token}/rsvp`
+        : `/public/events/${eventSlug}/rsvp`;
+
+      const res = await apiFetch<any>(endpoint, {
         method: 'POST',
         body: JSON.stringify({
-          guest_name: guestNameInput || 'Valued Guest',
-          phone: phoneInput,
+          guest_name: guestNameInput || defaultGuestName || 'Valued Guest',
+          phone: phoneInput || undefined,
           status: statusVal,
           adults_attending: countVal,
           meal_preference: mealVal,
@@ -90,7 +96,7 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
       });
 
       const responseData = res.data || {
-        guest_name: guestNameInput,
+        guest_name: guestNameInput || defaultGuestName || 'Valued Guest',
         status: statusVal,
         adults_attending: countVal,
         meal_preference: mealVal,
@@ -107,7 +113,7 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
   };
 
   const getInitials = (name: string) => {
-    if (!name) return 'RS';
+    if (!name) return 'VG';
     const parts = name.trim().split(' ');
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.slice(0, 2).toUpperCase();
@@ -293,11 +299,12 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
               <label className="text-xs font-bold text-[#302829] block uppercase tracking-wider font-mono">
                 Meal Preference
               </label>
-              <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 {[
-                  { id: 'Veg (only)', label: '🌱 Veg', sub: '(only)' },
-                  { id: 'Non-Veg (only)', label: '🍗 Non-Veg', sub: '(only)' },
-                  { id: 'Any', label: '🍲 Any', sub: "(doesn't matter)" },
+                  { id: 'Veg (only)', label: '🌱 Veg', sub: '(pure veg)' },
+                  { id: 'Jain (only)', label: '🙏 Jain', sub: '(no onion/garlic)' },
+                  { id: 'Non-Veg (only)', label: '🍗 Non-Veg', sub: '(halal/non-veg)' },
+                  { id: 'Any', label: '🍲 Any', sub: "(no preference)" },
                 ].map((meal) => (
                   <button
                     key={meal.id}
@@ -344,50 +351,84 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
 
         {/* STEP 3: THANK YOU / CONFIRMATION SCREEN */}
         {step === 'THANK_YOU' && (
-          <div className="space-y-6 text-center py-2">
+          <div className="space-y-5 text-center py-2">
             {/* Circle Checkmark Icon */}
-            <div className="w-16 h-16 rounded-full bg-[#F2E5E2] border-2 border-[#D8B5B0] text-[#9E6F6D] flex items-center justify-center mx-auto shadow-md animate-bounce">
-              <Check className="w-8 h-8 stroke-[3]" />
+            <div className="w-14 h-14 rounded-full bg-emerald-50 border-2 border-emerald-500/80 text-emerald-700 flex items-center justify-center mx-auto shadow-md animate-bounce">
+              <Check className="w-7 h-7 stroke-[3]" />
             </div>
 
-            <div className="space-y-1.5">
-              <h2 className="font-serif text-3xl font-extrabold gold-gradient-text">Thank You!</h2>
-              <p className="font-serif text-sm font-bold text-[#302829]">Your RSVP has been confirmed.</p>
-              <p className="text-xs text-[#8C7E80]">We can't wait to celebrate with you!</p>
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-800 font-extrabold block">
+                {submittedData?.status_label || (submittedData?.status === 'NO' ? 'RESPONSE RECORDED' : 'ATTENDANCE CONFIRMED')}
+              </span>
+              <h2 className="font-serif text-2xl sm:text-3xl font-extrabold gold-gradient-text">Thank You!</h2>
+              <p className="text-xs text-[#51484A]">
+                {submittedData?.status === 'NO' 
+                  ? 'We will miss you at the celebration!' 
+                  : "Your RSVP response has been confirmed. We can't wait to celebrate with you!"}
+              </p>
             </div>
 
-            {/* Summary Review Card */}
-            <div className="p-4 rounded-2xl bg-[#FAF7F3] border border-[#E9D3D0] max-w-sm mx-auto flex items-center justify-between gap-3 shadow-sm text-xs">
-              <div className="flex items-center gap-3 text-left">
-                <div className="w-9 h-9 rounded-full bg-[#9E6F6D] text-white font-bold text-xs flex items-center justify-center">
-                  {getInitials(submittedData?.guest_name || guestNameInput)}
-                </div>
-                <div>
-                  <span className="font-bold text-[#302829] block">{submittedData?.guest_name || guestNameInput}</span>
-                  <span className="text-[11px] text-[#8C7E80] block font-mono">
-                    {submittedData?.adults_attending || guestCount} guests • {submittedData?.meal_preference || mealPreference}
-                  </span>
-                </div>
+            {/* Structured Review Card */}
+            <div className="p-4 rounded-2xl bg-[#FAF7F3] border border-[#E9D3D0] max-w-sm mx-auto space-y-3 text-xs shadow-sm text-left">
+              <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-2">
+                <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold">GUEST IDENTITY</span>
+                <span className="font-bold text-[#302829]">{submittedData?.guest_name || guestNameInput || 'Valued Guest'}</span>
               </div>
+
+              <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-2">
+                <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold">GUESTS ATTENDING</span>
+                <span className="font-extrabold text-emerald-800">
+                  {submittedData?.status === 'NO' ? '0 (Not Attending)' : `${submittedData?.adults_attending || guestCount} guest(s)`}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-2">
+                <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold">MEAL PREFERENCE</span>
+                <span className="font-bold text-[#302829]">{submittedData?.meal_preference || mealPreference}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold">CELEBRATION</span>
+                <span className="font-serif font-bold text-[#302829] truncate max-w-[160px]">{eventTitle}</span>
+              </div>
+            </div>
+
+            {/* Quick Actions: Calendar + Change RSVP + Close */}
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1 max-w-sm mx-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(eventTitle)}&location=${encodeURIComponent(eventVenue)}`;
+                  window.open(gcalUrl, '_blank', 'noopener,noreferrer');
+                }}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Add to Calendar</span>
+              </button>
 
               <button
                 type="button"
-                onClick={() => setStep('FORM')}
-                className="px-3 py-1.5 rounded-xl bg-[#FFFDFC] text-[#9E6F6D] font-bold text-xs border border-[#D8B5B0] hover:bg-[#F2E5E2] flex items-center gap-1"
+                onClick={() => setStep('CHOICE')}
+                className="flex-1 py-2.5 px-3 rounded-xl bg-[#FAF7F3] hover:bg-[#F2E5E2] text-[#9E6F6D] border border-[#D8B5B0] font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
               >
-                <Edit2 className="w-3.5 h-3.5" /> Edit
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Change RSVP</span>
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-8 py-3.5 rounded-2xl bg-[#9E6F6D] hover:bg-[#875B59] text-white font-extrabold text-xs shadow-md transition-all"
-            >
-              Back to Celebration
-            </button>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full max-w-sm py-3 rounded-2xl bg-[#9E6F6D] hover:bg-[#875B59] text-white font-extrabold text-xs shadow-md transition-all active:scale-95"
+              >
+                Back to Celebration
+              </button>
+            </div>
 
-            <p className="text-[11px] font-serif italic text-[#8C7E80] block pt-2">
+            <p className="text-[10px] font-serif italic text-[#8C7E80] block pt-1">
               Together, we make celebrations beautiful ♡
             </p>
           </div>

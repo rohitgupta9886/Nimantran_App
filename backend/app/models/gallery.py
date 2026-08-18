@@ -26,6 +26,12 @@ class GalleryAlbum(Base):
     order_index: Mapped[int] = mapped_column(default=0)
 
 
+class ModerationStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
 class GalleryItem(Base):
     __tablename__ = "gallery_items"
 
@@ -41,7 +47,16 @@ class GalleryItem(Base):
     caption: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     uploaded_by_guest_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("guests.id"), nullable=True)
-    is_approved: Mapped[bool] = mapped_column(Boolean, default=True)
+    uploaded_by_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    
+    status: Mapped[ModerationStatus] = mapped_column(
+        SQLEnum(ModerationStatus), default=ModerationStatus.APPROVED, nullable=False, index=True
+    )
+    is_approved: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(nullable=True)
+    mime_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

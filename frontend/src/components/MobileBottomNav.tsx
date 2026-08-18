@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusCircle, Users, CreditCard, Sparkles } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, Users, Sparkles, CreditCard } from 'lucide-react';
 
 interface MobileBottomNavProps {
   onOpenVoiceModal?: () => void;
@@ -11,9 +11,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenVoiceMod
 
   const navItems = [
     {
-      label: 'Dashboard',
+      label: 'Home',
       path: '/dashboard',
       icon: LayoutDashboard,
+    },
+    {
+      label: 'Guests',
+      path: '/contacts',
+      icon: Users,
     },
     {
       label: 'Create',
@@ -22,12 +27,13 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenVoiceMod
       isPrimary: true,
     },
     {
-      label: 'Guests',
-      path: '/contacts',
-      icon: Users,
+      label: 'AI Concierge',
+      path: '#ai',
+      icon: Sparkles,
+      isAction: true,
     },
     {
-      label: 'Billing',
+      label: 'Credits',
       path: '/credits',
       icon: CreditCard,
     },
@@ -36,9 +42,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenVoiceMod
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-[#E9D3D0] px-3 pt-2 pb-safe xl:hidden shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
+      className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-xl border-t border-charcoal-200/80 px-2 pt-1.5 pb-safe xl:hidden shadow-[0_-4px_24px_rgba(31,27,24,0.06)]"
     >
-      <div className="flex items-center justify-around max-w-lg mx-auto">
+      <div className="flex items-center justify-around max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           const Icon = item.icon;
@@ -48,21 +54,44 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenVoiceMod
               <Link
                 key={item.path}
                 to={item.path}
-                className="flex flex-col items-center justify-center -mt-5 group focus:outline-none"
+                aria-label="Create celebration"
+                aria-current={isActive ? 'page' : undefined}
+                className="flex flex-col items-center justify-center -mt-6 group min-w-[48px] min-h-[48px] focus-visible:ring-2 focus-visible:ring-wine focus-visible:outline-none rounded-full"
               >
                 <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90 ${
+                  className={`w-13 h-13 rounded-full flex items-center justify-center shadow-lg transition-transform active:scale-90 ${
                     isActive
-                      ? 'bg-[#9E6F6D] text-white ring-4 ring-[#9E6F6D]/20'
-                      : 'bg-gradient-to-tr from-[#9E6F6D] via-[#875B59] to-[#5E3735] text-white'
+                      ? 'bg-wine text-white ring-4 ring-wine/20'
+                      : 'bg-gradient-to-tr from-wine via-wine-700 to-rose text-white'
                   }`}
+                  style={{ width: '50px', height: '50px' }}
                 >
                   <Icon className="w-6 h-6 text-white" />
                 </div>
-                <span className="text-[10px] font-bold text-[#9E6F6D] mt-1 tracking-tight">
+                <span className="text-[10px] font-bold text-wine mt-1 tracking-tight">
                   {item.label}
                 </span>
               </Link>
+            );
+          }
+
+          if (item.isAction) {
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={onOpenVoiceModal}
+                aria-label="Open AI Assistant"
+                className="flex flex-col items-center justify-center min-w-[48px] min-h-[48px] py-1 px-2.5 rounded-xl transition-all active:scale-95 text-charcoal-600 hover:text-wine focus-visible:ring-2 focus-visible:ring-wine focus-visible:outline-none"
+              >
+                <div className="relative">
+                  <Icon className="w-5 h-5 text-gold animate-pulse" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-gold absolute -top-0.5 -right-0.5" />
+                </div>
+                <span className="text-[10px] mt-0.5 tracking-tight font-medium">
+                  {item.label}
+                </span>
+              </button>
             );
           }
 
@@ -70,16 +99,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onOpenVoiceMod
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all active:scale-95 focus:outline-none ${
-                isActive
-                  ? 'text-[#9E6F6D] font-bold'
-                  : 'text-[#8C7E80] hover:text-[#302829]'
+              aria-label={`Navigate to ${item.label}`}
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex flex-col items-center justify-center min-w-[48px] min-h-[48px] py-1 px-2.5 rounded-xl transition-all active:scale-95 focus-visible:ring-2 focus-visible:ring-wine focus-visible:outline-none ${
+                isActive ? 'text-wine font-bold' : 'text-charcoal-500 hover:text-charcoal-900'
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-[#9E6F6D]' : 'text-[#8C7E80]'}`} />
-              <span className="text-[10px] mt-0.5 tracking-tight font-medium">
-                {item.label}
-              </span>
+              <Icon className={`w-5 h-5 ${isActive ? 'text-wine' : 'text-charcoal-400'}`} />
+              <span className="text-[10px] mt-0.5 tracking-tight font-medium">{item.label}</span>
             </Link>
           );
         })}

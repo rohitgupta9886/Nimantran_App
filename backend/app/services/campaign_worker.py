@@ -19,6 +19,9 @@ from app.services.whatsapp.phone_utils import normalize_phone_number
 from app.services.sms import get_sms_provider
 from app.services.email import get_email_provider
 
+from app.core.observability import metrics
+from app.core.context import set_campaign_id, set_message_id
+
 logger = logging.getLogger("nimantran_ai.campaign_worker")
 
 
@@ -34,10 +37,27 @@ class MultiChannelCampaignWorker:
         self._queued_set: set[str] = set()
         self.is_running = False
         self._worker_task: Optional[asyncio.Task] = None
+        self.last_heartbeat_at: Optional[datetime] = None
+        self.processed_count: int = 0
+        self.succeeded_count: int = 0
+        self.failed_count: int = 0
+
+    def get_health_status(self) -> Dict[str, Any]:
+        """Returns runtime health and readiness metrics for worker health probes."""
+        return {
+            "is_running": self.is_running,
+            "queue_size": self.queue.qsize(),
+            "processed_count": self.processed_count,
+            "succeeded_count": self.succeeded_count,
+            "failed_count": self.failed_count,
+            "last_heartbeat": self.last_heartbeat_at.isoformat() if self.last_heartbeat_at else None,
+            "status": "HEALTHY" if self.is_running else "STOPPED",
+        }
 
     def start(self):
         if not self.is_running:
             self.is_running = True
+            self.last_heartbeat_at = datetime.now(timezone.utc)
             self._worker_task = asyncio.create_task(self._worker_loop())
             logger.info("Multi-Channel Campaign Worker started.")
             # Trigger recovery of any pending jobs from previous run

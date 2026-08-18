@@ -131,31 +131,46 @@ async def get_event_rsvp_analytics(
     result = await db.execute(select(Guest).where(Guest.event_id == event_id))
     guests = result.scalars().all()
 
-    total_guests = len(guests) or 1
-    confirmed = sum(1 for g in guests if g.rsvp_status in [RSVPStatus.YES, "YES", "CONFIRMED"])
-    maybe = sum(1 for g in guests if g.rsvp_status in [RSVPStatus.MAYBE, "MAYBE"])
-    not_attending = sum(1 for g in guests if g.rsvp_status in [RSVPStatus.NO, "NO", "NOT_ATTENDING"])
-    awaiting = total_guests - (confirmed + maybe + not_attending)
+    real_total = len(guests)
+    total_guests_val = max(real_total, 1)
 
-    confirmed_pct = round((confirmed / total_guests) * 100)
-    maybe_pct = round((maybe / total_guests) * 100)
-    not_attending_pct = round((not_attending / total_guests) * 100)
-    awaiting_pct = round((awaiting / total_guests) * 100)
+    attending_guests = [g for g in guests if g.rsvp_status in [RSVPStatus.YES, "YES", "CONFIRMED", "ATTENDING"]]
+    confirmed = len(attending_guests)
+    maybe = sum(1 for g in guests if g.rsvp_status in [RSVPStatus.MAYBE, "MAYBE"])
+    not_attending = sum(1 for g in guests if g.rsvp_status in [RSVPStatus.NO, "NO", "NOT_ATTENDING", "DECLINED"])
+    awaiting = real_total - (confirmed + maybe + not_attending)
+
+    confirmed_pct = round((confirmed / total_guests_val) * 100)
+    maybe_pct = round((maybe / total_guests_val) * 100)
+    not_attending_pct = round((not_attending / total_guests_val) * 100)
+    awaiting_pct = round((awaiting / total_guests_val) * 100)
+
+    # Real headcount sum for attending guests (Headcount Readiness)
+    total_expected_headcount = sum((g.adults_count or 1) + (g.children_count or 0) for g in attending_guests)
+    total_expected_adults = sum((g.adults_count or 1) for g in attending_guests)
+    total_expected_children = sum((g.children_count or 0) for g in attending_guests)
 
     theme_config = event.theme_config or {}
     recent_feed = theme_config.get("recent_rsvps", [])
 
     return ResponseModel(
         data={
-            "total_guests": total_guests,
+            "total_invited": real_total,
+            "total_guests": real_total,
             "confirmed_count": confirmed,
+            "attending_count": confirmed,
             "confirmed_pct": confirmed_pct,
             "maybe_count": maybe,
             "maybe_pct": maybe_pct,
             "not_attending_count": not_attending,
+            "declined_count": not_attending,
             "not_attending_pct": not_attending_pct,
             "awaiting_count": awaiting,
+            "pending_count": awaiting,
             "awaiting_pct": awaiting_pct,
+            "total_expected_guests": total_expected_headcount,
+            "total_expected_adults": total_expected_adults,
+            "total_expected_children": total_expected_children,
             "recent_rsvps": recent_feed,
         },
         message="Real-time RSVP Analytics & Donut Breakdown ready"
@@ -186,9 +201,14 @@ async def get_event_attendance(
     checkins = list(c_res.scalars().all())
     checkin_method_map = {c.guest_id: c.check_in_method for c in checkins}
 
+    from app.models.guest import RSVPStatus
+
     total_guests = len(guests)
+    attending_guests = [g for g in guests if g.rsvp_status in [RSVPStatus.YES, "YES", "CONFIRMED", "ATTENDING"]]
+    total_expected = sum((g.adults_count or 1) + (g.children_count or 0) for g in attending_guests) if attending_guests else sum((g.adults_count or 1) + (g.children_count or 0) for g in guests)
+    
     attended_count = sum(1 for g in guests if g.checked_in)
-    not_attended_count = total_guests - attended_count
+    not_attended_count = max(0, total_guests - attended_count)
     attendance_pct = round((attended_count / total_guests * 100), 1) if total_guests > 0 else 0.0
 
     guest_list = []
@@ -213,8 +233,11 @@ async def get_event_attendance(
     return ResponseModel(
         data={
             "summary": {
+                "total_expected": total_expected,
                 "total_guests": total_guests,
+                "checked_in_count": attended_count,
                 "attended_count": attended_count,
+                "remaining_count": not_attended_count,
                 "not_attended_count": not_attended_count,
                 "attendance_pct": attendance_pct,
             },

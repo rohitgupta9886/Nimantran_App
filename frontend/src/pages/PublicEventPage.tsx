@@ -184,15 +184,18 @@ export const PublicEventPage: React.FC = () => {
 
   // 1-Tap Quick RSVP Submission
   const handleQuickRsvp = async (status: 'CONFIRMED' | 'MAYBE' | 'NOT_ATTENDING') => {
-    const targetIdentifier = slug || token;
-    if (!targetIdentifier) return;
+    if (!slug && !token) return;
     setQuickRsvpSubmitting(true);
     try {
-      await apiFetch<any>(`/public/events/${targetIdentifier}/rsvp`, {
+      const endpoint = token
+        ? `/public/invitations/t/${token}/rsvp`
+        : `/public/events/${slug}/rsvp`;
+
+      const res = await apiFetch<any>(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           guest_name: guestPersonalization?.guest_name || 'Valued Guest',
-          status: status,
+          status: status === 'CONFIRMED' ? 'YES' : status,
           adults_attending: status === 'CONFIRMED' ? 2 : 1,
         }),
       });
@@ -212,10 +215,13 @@ export const PublicEventPage: React.FC = () => {
   const handlePostWish = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!wishMessage || (!slug && !token)) return;
-    const targetIdentifier = slug || token;
     setSubmittingWish(true);
     try {
-      const res = await apiFetch<any>(`/public/events/${targetIdentifier}/wishes`, {
+      const endpoint = token
+        ? `/public/invitations/t/${token}/wishes`
+        : `/public/events/${slug}/wishes`;
+
+      const res = await apiFetch<any>(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           sender_name: wishName || guestPersonalization?.guest_name || 'Well Wisher',
@@ -248,16 +254,21 @@ export const PublicEventPage: React.FC = () => {
 
   if (!data || !data.event) {
     return (
-      <div className="min-h-[100svh] min-h-screen bg-[#0A1128] flex flex-col items-center justify-center p-4 text-center space-y-4 text-white">
-        <div className="w-16 h-16 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center">
-          <X className="w-8 h-8" />
+      <div className="min-h-[100svh] min-h-screen bg-[#0A1128] flex flex-col items-center justify-center p-6 text-center space-y-5 text-white">
+        <div className="w-20 h-20 rounded-full bg-amber-500/10 border-2 border-amber-400/30 text-amber-300 flex items-center justify-center shadow-2xl animate-pulse">
+          <Sparkles className="w-10 h-10 text-amber-300" />
         </div>
-        <h2 className="font-serif text-2xl font-bold">Invitation Unavailable</h2>
-        <p className="text-xs text-slate-400 max-w-sm">
-          The requested invitation link is either expired or does not exist.
-        </p>
-        <a href="/" className="px-6 py-3 rounded-full bg-amber-500 text-black font-bold text-xs shadow-lg">
-          Return to Nimantran AI Home
+        <div className="space-y-2 max-w-sm">
+          <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-amber-200">Invitation Unavailable</h2>
+          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            Sorry, this invitation is no longer available or the link may have expired.
+          </p>
+        </div>
+        <a 
+          href="/" 
+          className="px-8 py-3.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-extrabold text-xs shadow-xl active:scale-95 transition-all"
+        >
+          Return to Nimantran AI
         </a>
       </div>
     );
@@ -915,7 +926,8 @@ export const PublicEventPage: React.FC = () => {
         <RsvpExperienceModal
           isOpen={isRsvpModalOpen}
           onClose={() => setIsRsvpModalOpen(false)}
-          eventSlug={slug || token || ''}
+          eventSlug={slug || ''}
+          token={token || ''}
           eventTitle={evt.title}
           eventDate={formatDateSafe(evt.start_date, { day: 'numeric', month: 'short', year: 'numeric' })}
           eventVenue={fullVenue}

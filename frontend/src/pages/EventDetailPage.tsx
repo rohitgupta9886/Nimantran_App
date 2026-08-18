@@ -4,7 +4,7 @@ import {
   Calendar, Users, QrCode, Tv, Eye, Plus, Upload, Send, Sparkles, 
   CheckCircle, CheckCircle2, Smartphone, Edit2, Trash2, MessageSquare, PhoneCall, 
   Copy, FileText, Check, X, AlertCircle, Heart, Image as ImageIcon,
-  Download, FileImage, ArrowLeft, Camera, Key, Bell, Clock, Star, Trophy, Gift
+  Download, FileImage, ArrowLeft, Camera, Key, Bell, Clock, Star, Trophy, Gift, Search
 } from 'lucide-react';
 import { apiFetch } from '../services/api';
 import { InvitationCard } from '../components/InvitationCard';
@@ -47,19 +47,44 @@ export const EventDetailPage: React.FC = () => {
   const [attendanceSearch, setAttendanceSearch] = useState('');
   const [attendanceFilter, setAttendanceFilter] = useState<'ALL' | 'ATTENDED' | 'NOT_ATTENDED'>('ALL');
 
+  // Guest Search & Filtering
+  const [guestSearch, setGuestSearch] = useState('');
+  const [guestGroupFilter, setGuestGroupFilter] = useState('ALL');
+  const [guestRsvpFilter, setGuestRsvpFilter] = useState('ALL');
+  const [guestDeliveryFilter, setGuestDeliveryFilter] = useState('ALL');
+
+  // Duplicate Check Modal State
+  const [duplicateCandidate, setDuplicateCandidate] = useState<any | null>(null);
+  const [duplicateMatchInfo, setDuplicateMatchInfo] = useState<any | null>(null);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+
+  // 2-Stage Bulk Import Modal State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importPreviewData, setImportPreviewData] = useState<any | null>(null);
+  const [importDuplicatePolicy, setImportDuplicatePolicy] = useState<'SKIP' | 'MERGE' | 'KEEP_SEPARATE'>('SKIP');
+  const [importSaveToMaster, setImportSaveToMaster] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+
   // Add Guest Form state
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
-  const [guestRel, setGuestRel] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestRel, setGuestRel] = useState('Guest');
   const [guestGroup, setGuestGroup] = useState('General');
+  const [guestLanguage, setGuestLanguage] = useState('AUTO');
   const [addingGuest, setAddingGuest] = useState(false);
 
   // Edit Guest Modal state
   const [editingGuest, setEditingGuest] = useState<any | null>(null);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
   const [editRel, setEditRel] = useState('');
   const [editGroup, setEditGroup] = useState('');
+  const [editLanguage, setEditLanguage] = useState('AUTO');
+  const [editAdults, setEditAdults] = useState(1);
+  const [editChildren, setEditChildren] = useState(0);
+  const [editNotes, setEditNotes] = useState('');
 
   // AI Invitation & WhatsApp Card Modal state
   const [cardModalGuest, setCardModalGuest] = useState<any | null>(null);
@@ -105,7 +130,6 @@ export const EventDetailPage: React.FC = () => {
   useEffect(() => {
     if (searchParams.get('openShare') === 'true') {
       setIsBulkWhatsAppOpen(true);
-      // Clean up URL without page reload
       navigate(`/events/${id}`, { replace: true });
     }
   }, [searchParams, id, navigate]);
@@ -120,6 +144,15 @@ export const EventDetailPage: React.FC = () => {
     const res = await apiFetch<any[]>(`/events/${id}/guests`);
     setGuests(res.data);
   };
+
+  // Periodic polling for live check-in sync on Attendance tab
+  useEffect(() => {
+    if (activeTab !== 'attendance' || !id) return;
+    const interval = setInterval(() => {
+      refreshGuests().catch(() => {});
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [activeTab, id]);
 
   // Perform Gate Pass Check-in Verification
   const handleVerifyCheckin = async (codeToVerify: string, method: 'QR_SCAN' | 'MANUAL_PASSCODE' = 'QR_SCAN') => {
@@ -145,26 +178,57 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
-  // Add Single Guest
+  // Add Single Guest with Safe Duplicate Protection
   const handleAddGuest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guestName || !id) return;
     setAddingGuest(true);
     try {
+      // 1. Pre-flight duplicate check
+      const dupCheck = await apiFetch<any>(`/events/${id}/guests/check-duplicate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: guestName,
+          phone: guestPhone || undefined,
+          email: guestEmail || undefined,
+        }),
+      });
+
+      if (dupCheck.data?.has_duplicate && dupCheck.data?.matched_guest) {
+        setDuplicateCandidate({
+          name: guestName,
+          phone: guestPhone || undefined,
+          email: guestEmail || undefined,
+          relationship: guestRel || 'Guest',
+          group_name: guestGroup || 'General',
+          language: guestLanguage || 'AUTO',
+          save_to_master_list: saveToMasterList,
+        });
+        setDuplicateMatchInfo(dupCheck.data);
+        setIsDuplicateModalOpen(true);
+        setAddingGuest(false);
+        return;
+      }
+
+      // 2. No duplicate -> create guest
       const res = await apiFetch<any>(`/events/${id}/guests`, {
         method: 'POST',
         body: JSON.stringify({
           name: guestName,
           phone: guestPhone || undefined,
+          email: guestEmail || undefined,
           relationship: guestRel || 'Guest',
           group_name: guestGroup || 'General',
+          language: guestLanguage || 'AUTO',
           save_to_master_list: saveToMasterList,
+          allow_duplicate: true,
         }),
       });
       setGuests([res.data, ...guests]);
       setGuestName('');
       setGuestPhone('');
-      setGuestRel('');
+      setGuestEmail('');
+      setGuestRel('Guest');
       setSaveToMasterList(false);
       setStatusNotice(`Added ${res.data.name} to guest list!${saveToMasterList ? ' (Saved to Master List)' : ''}`);
       setTimeout(() => setStatusNotice(null), 3500);
@@ -175,88 +239,115 @@ export const EventDetailPage: React.FC = () => {
     }
   };
 
-  // One-Tap Mobile Contact Picker (Web Contacts API)
-  const handleOneTapMobileContacts = async () => {
-    if (!('contacts' in navigator && 'ContactsManager' in window)) {
-      alert('Mobile address book API is available on Android/Chrome mobile browsers. Use VCF / File upload fallback below.');
-      return;
-    }
-
+  // Duplicate Resolution: Merge into Existing Guest
+  const handleConfirmMerge = async () => {
+    if (!duplicateMatchInfo?.matched_guest?.id || !duplicateCandidate || !id) return;
     try {
-      const props = ['name', 'tel', 'email'];
-      const opts = { multiple: true };
-      const selectedContacts: any = await (navigator as any).contacts.select(props, opts);
-      if (selectedContacts && selectedContacts.length > 0) {
-        const payload = selectedContacts.map((c: any) => ({
-          name: (c.name && c.name[0]) || 'Mobile Contact',
-          phone: (c.tel && c.tel[0]) || null,
-          email: (c.email && c.email[0]) || null,
-          relationship: 'Guest',
-          group_name: 'Mobile Contacts',
-        }));
-
-        const res = await apiFetch<any>(`/events/${id}/guests/bulk`, {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        await refreshGuests();
-        setStatusNotice(res.message || `Imported ${payload.length} contacts directly from phonebook!`);
-        setTimeout(() => setStatusNotice(null), 4000);
-      }
-    } catch (err: any) {
-      console.error('Contacts picker error:', err);
-    }
-  };
-
-  // VCF vCard File Upload Parser
-  const handleVcfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !id) return;
-    const text = await file.text();
-    parseAndImportVcf(text);
-  };
-
-  const parseAndImportVcf = async (rawVcf: string) => {
-    const lines = rawVcf.split(/\r?\n/);
-    const imported: any[] = [];
-    let current: any = {};
-
-    lines.forEach((line) => {
-      if (line.startsWith('BEGIN:VCARD')) {
-        current = {};
-      } else if (line.startsWith('FN:') || line.startsWith('N:')) {
-        current.name = line.split(':')[1].replace(/;/g, ' ').trim();
-      } else if (line.includes('TEL')) {
-        current.phone = line.split(':')[1].trim();
-      } else if (line.includes('EMAIL')) {
-        current.email = line.split(':')[1].trim();
-      } else if (line.startsWith('END:VCARD')) {
-        if (current.name) {
-          imported.push({
-            name: current.name,
-            phone: current.phone || null,
-            email: current.email || null,
-            relationship: 'Guest',
-            group_name: 'VCF Contacts',
-          });
-        }
-      }
-    });
-
-    if (imported.length > 0) {
-      const res = await apiFetch<any>(`/events/${id}/guests/bulk`, {
+      const res = await apiFetch<any>(`/events/${id}/guests/merge/${duplicateMatchInfo.matched_guest.id}`, {
         method: 'POST',
-        body: JSON.stringify(imported),
+        body: JSON.stringify({
+          phone: duplicateCandidate.phone,
+          email: duplicateCandidate.email,
+          relationship: duplicateCandidate.relationship,
+          group_name: duplicateCandidate.group_name,
+          language: duplicateCandidate.language,
+        }),
       });
       await refreshGuests();
-      setStatusNotice(`Successfully imported ${imported.length} contacts from VCF file!`);
-      setTimeout(() => setStatusNotice(null), 4000);
-    } else {
-      alert('No valid contacts found in VCF file.');
+      setIsDuplicateModalOpen(false);
+      setDuplicateCandidate(null);
+      setDuplicateMatchInfo(null);
+      setGuestName('');
+      setGuestPhone('');
+      setGuestEmail('');
+      setStatusNotice(`Updated and merged contact details for ${res.data.name}!`);
+      setTimeout(() => setStatusNotice(null), 3500);
+    } catch (err: any) {
+      alert(err.message || 'Failed to merge guest');
     }
   };
 
-  // Edit Guest
+  // Duplicate Resolution: Keep Separate
+  const handleConfirmKeepSeparate = async () => {
+    if (!duplicateCandidate || !id) return;
+    try {
+      const res = await apiFetch<any>(`/events/${id}/guests`, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...duplicateCandidate,
+          allow_duplicate: true,
+        }),
+      });
+      setGuests([res.data, ...guests]);
+      setIsDuplicateModalOpen(false);
+      setDuplicateCandidate(null);
+      setDuplicateMatchInfo(null);
+      setGuestName('');
+      setGuestPhone('');
+      setGuestEmail('');
+      setStatusNotice(`Created separate guest record for ${res.data.name}!`);
+      setTimeout(() => setStatusNotice(null), 3500);
+    } catch (err: any) {
+      alert(err.message || 'Failed to add guest');
+    }
+  };
+
+  // 2-Stage Bulk Import File Upload & Preview Handler
+  const handleImportFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    setImportLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await apiFetch<any>(`/events/${id}/guests/import-preview`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      setImportPreviewData(res.data);
+      setIsImportModalOpen(true);
+    } catch (err: any) {
+      alert(err.message || 'Failed to analyze import file. Ensure valid CSV/Excel format.');
+    } finally {
+      setImportLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  // Execute Stage 2 Bulk Import Confirmation
+  const handleExecuteImport = async () => {
+    if (!importPreviewData || !id) return;
+    setImportLoading(true);
+    try {
+      const itemsToImport = [
+        ...importPreviewData.valid_items.map((v: any) => v.raw),
+        ...(importDuplicatePolicy !== 'SKIP' ? importPreviewData.duplicate_items.map((d: any) => d.raw) : []),
+      ];
+
+      const res = await apiFetch<any>(`/events/${id}/guests/import-confirm`, {
+        method: 'POST',
+        body: JSON.stringify({
+          items: itemsToImport,
+          on_duplicate: importDuplicatePolicy,
+          save_to_master_list: importSaveToMaster,
+        }),
+      });
+
+      await refreshGuests();
+      setIsImportModalOpen(false);
+      setImportPreviewData(null);
+      setStatusNotice(res.message || 'Contacts imported successfully into your celebration!');
+      setTimeout(() => setStatusNotice(null), 4000);
+    } catch (err: any) {
+      alert(err.message || 'Failed to complete import');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // Save Edited Guest Details
   const handleSaveEdit = async () => {
     if (!editingGuest || !id) return;
     try {
@@ -264,17 +355,22 @@ export const EventDetailPage: React.FC = () => {
         method: 'PUT',
         body: JSON.stringify({
           name: editName,
-          phone: editPhone,
+          phone: editPhone || undefined,
+          email: editEmail || undefined,
           relationship: editRel,
           group_name: editGroup,
+          adults_count: editAdults,
+          children_count: editChildren,
+          language: editLanguage,
+          notes: editNotes,
         }),
       });
       setGuests(guests.map((g) => (g.id === editingGuest.id ? res.data : g)));
       setEditingGuest(null);
-      setStatusNotice('Guest updated successfully!');
+      setStatusNotice(`Updated details for ${res.data.name}!`);
       setTimeout(() => setStatusNotice(null), 3000);
     } catch (err: any) {
-      alert(err.message || 'Failed to update guest');
+      alert(err.message || 'Failed to update guest details');
     }
   };
 
@@ -709,13 +805,17 @@ export const EventDetailPage: React.FC = () => {
           {/* REAL-TIME LIVE RSVP DONUT ANALYTICS & RECENT RSVPS STREAM */}
           <RsvpAnalyticsCard eventId={event.id} />
 
-          {/* Quick Action Bar */}
+          {/* Quick Action & Import Header Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-[#E9D3D0] shadow-md">
             <div>
-              <h3 className="font-serif text-lg font-extrabold text-[#302829] flex items-center gap-2">
-                <Users className="w-5 h-5 text-[#9E6F6D]" /> Celebration Guest List
-              </h3>
-              <p className="text-xs text-[#7A6B6C]">Add guest details, import phone contacts, or choose from your saved contacts</p>
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#9E6F6D]" />
+                <h3 className="font-serif text-lg font-extrabold text-[#302829]">Celebration Guest Directory</h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#F2E5E2] text-[#9E6F6D] text-xs font-bold font-mono">
+                  👥 {guests.length} Guests
+                </span>
+              </div>
+              <p className="text-xs text-[#7A6B6C] mt-0.5">Manage guests, categorize groups, track RSVPs, and protect against duplicates</p>
             </div>
 
             <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
@@ -726,28 +826,25 @@ export const EventDetailPage: React.FC = () => {
                 <Users className="w-4 h-4 text-white" /> Choose Saved Guests
               </button>
 
-              <div className="inline-flex items-center gap-2 flex-nowrap">
-                <button
-                  onClick={handleOneTapMobileContacts}
-                  className="px-3.5 py-2.5 rounded-2xl bg-[#F2E5E2] hover:bg-[#E9D3D0] text-[#9E6F6D] border border-[#E9D3D0] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors"
-                >
-                  <Smartphone className="w-4 h-4 text-[#9E6F6D]" /> Import Phone Contacts
-                </button>
-
-                <label className="px-3.5 py-2.5 rounded-2xl bg-[#FAF6F0] hover:bg-[#F2E5E2] text-[#302829] border border-[#E9D3D0] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap transition-colors">
-                  <Upload className="w-4 h-4 text-[#9E6F6D]" /> Upload Contact File
- (Google / iPhone)
-                  <input type="file" accept=".vcf,text/vcard" onChange={handleVcfUpload} className="hidden" />
-                </label>
-              </div>
+              <label className="px-4 py-2.5 rounded-2xl bg-[#F2E5E2] hover:bg-[#E9D3D0] text-[#9E6F6D] border border-[#E9D3D0] font-extrabold text-xs inline-flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap transition-colors shadow-sm">
+                <Upload className="w-4 h-4 text-[#9E6F6D]" />
+                <span>{importLoading ? 'Analyzing...' : 'Import Contacts (CSV/Excel/vCard)'}</span>
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls,.vcf,text/vcard"
+                  onChange={handleImportFileSelect}
+                  disabled={importLoading}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
 
-          {/* Add Guest Form */}
+          {/* Add Guest Form with Safe Duplicate Check */}
           <div className="bg-white/90 backdrop-blur-xl p-6 rounded-3xl border border-[#E9D3D0] shadow-md space-y-4 text-[#302829]">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h4 className="font-serif text-sm font-extrabold text-[#302829] flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#9E6F6D]" /> Add New Guest
+                <Plus className="w-4 h-4 text-[#9E6F6D]" /> Add New Guest to Celebration
               </h4>
 
               <label className="flex items-center gap-2 text-xs text-[#9E6F6D] font-extrabold cursor-pointer">
@@ -757,11 +854,11 @@ export const EventDetailPage: React.FC = () => {
                   onChange={(e) => setSaveToMasterList(e.target.checked)}
                   className="rounded border-[#E9D3D0] bg-[#FFFDFB] text-[#9E6F6D] focus:ring-[#9E6F6D]"
                 />
-                Save contact for future celebrations
+                Save to Master Address Book
               </label>
             </div>
 
-            <form onSubmit={handleAddGuest} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+            <form onSubmit={handleAddGuest} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
               <input
                 type="text"
                 required
@@ -777,18 +874,39 @@ export const EventDetailPage: React.FC = () => {
                 onChange={(e) => setGuestPhone(e.target.value)}
                 className="px-4 py-2.5 rounded-2xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
               />
+              <input
+                type="email"
+                placeholder="Email Address (Optional)"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                className="px-4 py-2.5 rounded-2xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
+              />
               <select
-                value={guestRel}
-                onChange={(e) => setGuestRel(e.target.value)}
+                value={guestGroup}
+                onChange={(e) => setGuestGroup(e.target.value)}
                 className="px-4 py-2.5 rounded-2xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
               >
-                <option value="General">Guest Category: General</option>
-                <option value="Special">Guest Category: Special</option>
-                <option value="VIP">Guest Category: VIP</option>
-                <option value="Family">Guest Category: Family</option>
-                <option value="Relatives">Guest Category: Relatives</option>
-                <option value="Friends">Guest Category: Friends</option>
-                <option value="Colleagues">Guest Category: Colleagues</option>
+                <option value="General">Group: General</option>
+                <option value="Family">Group: Family</option>
+                <option value="Relatives">Group: Relatives</option>
+                <option value="Friends">Group: Friends</option>
+                <option value="Bride Side">Group: Bride Side</option>
+                <option value="Groom Side">Group: Groom Side</option>
+                <option value="VIP">Group: VIP</option>
+                <option value="Colleagues">Group: Colleagues / Office</option>
+                <option value="Other">Group: Other</option>
+              </select>
+
+              <select
+                value={guestLanguage}
+                onChange={(e) => setGuestLanguage(e.target.value)}
+                className="px-4 py-2.5 rounded-2xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
+                title="Preferred invitation language for AI personalizations"
+              >
+                <option value="AUTO">Language: Auto</option>
+                <option value="HI">Language: Hindi</option>
+                <option value="EN">Language: English</option>
+                <option value="HINGLISH">Language: Hinglish</option>
               </select>
 
               <button
@@ -796,17 +914,93 @@ export const EventDetailPage: React.FC = () => {
                 disabled={addingGuest}
                 className="py-2.5 px-4 rounded-2xl bg-gradient-to-r from-[#9E6F6D] via-[#875B59] to-[#9E6F6D] text-white font-extrabold text-xs shadow-md hover:scale-105 transition-all flex items-center justify-center gap-1.5 border border-[#E9D3D0]"
               >
-                <Plus className="w-4 h-4 text-white" /> {addingGuest ? 'Adding...' : 'Add Guest to List'}
+                <Plus className="w-4 h-4 text-white" /> {addingGuest ? 'Checking...' : 'Add Guest'}
               </button>
+            </form>
+          </div>
 
+          {/* SEARCH & MULTI-DIMENSIONAL FILTERS */}
+          <div className="bg-white/90 backdrop-blur-xl p-5 rounded-3xl border border-[#E9D3D0] shadow-md space-y-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              {/* Search Bar */}
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-[#8C7E80] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search guest by name, phone, email, pass code, or notes..."
+                  value={guestSearch}
+                  onChange={(e) => setGuestSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-2xl bg-[#FFFDFB] border border-[#E9D3D0] text-xs font-semibold text-[#302829] focus:outline-none focus:border-[#9E6F6D]"
+                />
+                {guestSearch && (
+                  <button
+                    onClick={() => setGuestSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#8C7E80] hover:text-[#302829]"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Broadcast Quick Action */}
               <button
                 type="button"
                 onClick={() => setIsBulkWhatsAppOpen(true)}
-                className="py-2.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md hover:scale-105 transition-transform flex items-center justify-center gap-1.5 border border-emerald-300"
+                className="py-2 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md hover:scale-105 transition-transform flex items-center justify-center gap-1.5 border border-emerald-300 whitespace-nowrap"
               >
-                <Send className="w-4 h-4 text-white" /> Invite All via WhatsApp
+                <Send className="w-4 h-4 text-white" /> Send WhatsApp Broadcast
               </button>
-            </form>
+            </div>
+
+            {/* Filter Chips Bar */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <span className="text-[10px] font-mono uppercase font-bold text-[#8C7E80] mr-1">GROUPS:</span>
+              {[
+                { id: 'ALL', label: 'All Groups' },
+                { id: 'Family', label: 'Family' },
+                { id: 'Friends', label: 'Friends' },
+                { id: 'Relatives', label: 'Relatives' },
+                { id: 'Bride Side', label: 'Bride Side' },
+                { id: 'Groom Side', label: 'Groom Side' },
+                { id: 'VIP', label: 'VIP' },
+                { id: 'Colleagues', label: 'Colleagues' },
+              ].map((grp) => (
+                <button
+                  key={grp.id}
+                  onClick={() => setGuestGroupFilter(grp.id)}
+                  className={`px-3 py-1 rounded-full text-[11px] font-bold transition-all ${
+                    guestGroupFilter === grp.id
+                      ? 'bg-[#9E6F6D] text-white shadow-sm scale-105'
+                      : 'bg-[#FAF7F3] text-[#51484A] border border-[#E9D3D0] hover:bg-[#F2E5E2]'
+                  }`}
+                >
+                  {grp.label}
+                </button>
+              ))}
+
+              <div className="h-4 w-px bg-[#E9D3D0] mx-1" />
+
+              <span className="text-[10px] font-mono uppercase font-bold text-[#8C7E80] mr-1">RSVP:</span>
+              {[
+                { id: 'ALL', label: 'All' },
+                { id: 'YES', label: '🟢 Attending' },
+                { id: 'PENDING', label: '⚪ Pending' },
+                { id: 'MAYBE', label: '🟠 Maybe' },
+                { id: 'NO', label: '🔴 Declined' },
+              ].map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setGuestRsvpFilter(r.id)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                    guestRsvpFilter === r.id
+                      ? 'bg-[#302829] text-[#C9AA78] shadow-sm'
+                      : 'bg-[#FAF7F3] text-[#51484A] border border-[#E9D3D0] hover:bg-[#F2E5E2]'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Guest List Table */}
@@ -815,29 +1009,64 @@ export const EventDetailPage: React.FC = () => {
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#302829] border-b border-[#E9D3D0] text-[#C9AA78] font-serif font-bold">
                   <tr>
-                    <th className="p-4">Guest Name</th>
+                    <th className="p-4">Guest Name & Info</th>
                     <th className="p-4">Group / Rel</th>
                     <th className="p-4">WhatsApp Phone</th>
+                    <th className="p-4">Language</th>
                     <th className="p-4">Delivery Status</th>
                     <th className="p-4">RSVP Status</th>
                     <th className="p-4">Entry Pass</th>
-                    <th className="p-4 text-center">AI Invitation & WhatsApp Link</th>
+                    <th className="p-4 text-center">AI Invitation & Share</th>
                     <th className="p-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E9D3D0] text-[#302829]">
-                  {guests.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="p-8 text-center text-[#8C7E80]">
-                        No guests added yet. Tap <strong>Import Phone Contacts</strong> or add guests above!
-                      </td>
-                    </tr>
-                  ) : (
-                    guests.map((g) => (
+                  {(() => {
+                    const filtered = guests.filter((g) => {
+                      if (guestGroupFilter !== 'ALL') {
+                        const gGroup = (g.group_name || 'General').toLowerCase();
+                        const filterLower = guestGroupFilter.toLowerCase();
+                        if (filterLower === 'other' || filterLower === 'general') {
+                          if (gGroup !== 'general' && gGroup !== 'other') return false;
+                        } else if (!gGroup.includes(filterLower)) {
+                          return false;
+                        }
+                      }
+                      if (guestRsvpFilter !== 'ALL') {
+                        if (g.rsvp_status !== guestRsvpFilter) return false;
+                      }
+                      if (guestSearch.trim()) {
+                        const q = guestSearch.toLowerCase();
+                        const code = g.pass_code || g.invitation_token || '';
+                        return (
+                          g.name.toLowerCase().includes(q) ||
+                          (g.phone && g.phone.includes(q)) ||
+                          (g.email && g.email.toLowerCase().includes(q)) ||
+                          (g.notes && g.notes.toLowerCase().includes(q)) ||
+                          code.toLowerCase().includes(q)
+                        );
+                      }
+                      return true;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-[#8C7E80]">
+                            {guests.length === 0
+                              ? 'No guests added yet. Tap "Import Contacts" or add guests above!'
+                              : `No guests matching search / filter criteria (${guests.length} total in event).`}
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filtered.map((g) => (
                       <tr key={g.id} className="hover:bg-[#FAF7F3] transition-colors">
                         <td className="p-4 font-bold text-[#302829]">
                           <div className="text-sm">{g.name}</div>
-                          {g.notes && <div className="text-[10px] text-[#8C7E80] font-normal">{g.notes}</div>}
+                          {g.email && <div className="text-[10px] text-[#7A6B6C] font-mono">{g.email}</div>}
+                          {g.notes && <div className="text-[10px] text-[#8C7E80] font-normal italic">{g.notes}</div>}
                         </td>
                         <td className="p-4 text-[#51484A]">
                           <span className="px-2 py-0.5 rounded-full bg-[#F2E5E2] text-[#9E6F6D] text-[10px] font-bold border border-[#D8B5B0]">
@@ -846,6 +1075,11 @@ export const EventDetailPage: React.FC = () => {
                           <span className="ml-1.5 text-xs text-[#51484A] font-semibold">{g.relationship || 'Guest'}</span>
                         </td>
                         <td className="p-4 font-mono text-[#302829] font-bold text-xs">{g.phone || '—'}</td>
+                        <td className="p-4">
+                          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-mono text-[10px] font-bold border border-slate-200">
+                            {g.language || 'AUTO'}
+                          </span>
+                        </td>
                         <td className="p-4">
                           <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] border ${
                             g.delivery_status === 'READ' || g.open_count > 0
@@ -916,8 +1150,13 @@ export const EventDetailPage: React.FC = () => {
                                 setEditingGuest(g);
                                 setEditName(g.name);
                                 setEditPhone(g.phone || '');
-                                setEditRel(g.relationship || '');
+                                setEditEmail(g.email || '');
+                                setEditRel(g.relationship || 'Guest');
                                 setEditGroup(g.group_name || 'General');
+                                setEditLanguage(g.language || 'AUTO');
+                                setEditAdults(g.adults_count || 1);
+                                setEditChildren(g.children_count || 0);
+                                setEditNotes(g.notes || '');
                               }}
                               className="p-1.5 rounded-lg bg-[#F2E5E2] text-[#9E6F6D] hover:bg-[#E9D3D0] border border-[#D8B5B0]/50"
                               title="Edit Guest"
@@ -934,8 +1173,8 @@ export const EventDetailPage: React.FC = () => {
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -967,39 +1206,49 @@ export const EventDetailPage: React.FC = () => {
           </div>
 
           {/* ATTENDANCE SUMMARY STATS CARDS */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-5 rounded-2xl bg-white border border-[#E9D3D0] shadow-sm space-y-1">
-              <span className="text-[10px] font-mono uppercase font-bold text-[#8C7E80]">TOTAL GUESTS</span>
-              <div className="text-3xl font-extrabold text-[#302829] font-serif">{guests.length}</div>
-              <span className="text-[11px] text-[#7A6B6C] font-mono">Invited to Event</span>
-            </div>
+          {(() => {
+            const attendedCount = guests.filter((g) => g.checked_in).length;
+            const notAttendedCount = guests.filter((g) => !g.checked_in).length;
+            const attendingRsvpHeadcount = guests
+              .filter((g) => ['YES', 'CONFIRMED', 'ATTENDING'].includes(g.rsvp_status))
+              .reduce((acc, g) => acc + (g.adults_count || 1) + (g.children_count || 0), 0);
+            const totalExpected = attendingRsvpHeadcount || guests.reduce((acc, g) => acc + (g.adults_count || 1) + (g.children_count || 0), 0);
+            const attendancePct = guests.length > 0 ? ((attendedCount / guests.length) * 100).toFixed(1) : '0';
 
-            <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-sm space-y-1">
-              <span className="text-[10px] font-mono uppercase font-bold text-emerald-800">ATTENDED</span>
-              <div className="text-3xl font-extrabold text-emerald-900 font-serif">
-                {guests.filter((g) => g.checked_in).length}
-              </div>
-              <span className="text-[11px] text-emerald-700 font-mono">✓ Gate Checked-In</span>
-            </div>
+            return (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-white border border-[#E9D3D0] shadow-sm space-y-1">
+                  <span className="text-[10px] font-mono uppercase font-bold text-[#8C7E80]">TOTAL EXPECTED</span>
+                  <div className="text-3xl font-extrabold text-[#302829] font-serif">{totalExpected}</div>
+                  <span className="text-[11px] text-[#7A6B6C] font-mono">{guests.length} Invited Invitations</span>
+                </div>
 
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm space-y-1">
-              <span className="text-[10px] font-mono uppercase font-bold text-slate-600">NOT ATTENDED</span>
-              <div className="text-3xl font-extrabold text-slate-800 font-serif">
-                {guests.filter((g) => !g.checked_in).length}
-              </div>
-              <span className="text-[11px] text-slate-500 font-mono">Pending Arrival</span>
-            </div>
+                <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-sm space-y-1">
+                  <span className="text-[10px] font-mono uppercase font-bold text-emerald-800">CHECKED IN</span>
+                  <div className="text-3xl font-extrabold text-emerald-900 font-serif">
+                    {attendedCount}
+                  </div>
+                  <span className="text-[11px] text-emerald-700 font-mono">✓ Gate Verified</span>
+                </div>
 
-            <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 shadow-sm space-y-1">
-              <span className="text-[10px] font-mono uppercase font-bold text-amber-800">ATTENDANCE RATE</span>
-              <div className="text-3xl font-extrabold text-amber-900 font-serif">
-                {guests.length > 0
-                  ? `${((guests.filter((g) => g.checked_in).length / guests.length) * 100).toFixed(1)}%`
-                  : '0%'}
+                <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm space-y-1">
+                  <span className="text-[10px] font-mono uppercase font-bold text-slate-600">REMAINING</span>
+                  <div className="text-3xl font-extrabold text-slate-800 font-serif">
+                    {notAttendedCount}
+                  </div>
+                  <span className="text-[11px] text-slate-500 font-mono">Pending Arrival</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 shadow-sm space-y-1">
+                  <span className="text-[10px] font-mono uppercase font-bold text-amber-800">ATTENDANCE RATE</span>
+                  <div className="text-3xl font-extrabold text-amber-900 font-serif">
+                    {attendancePct}%
+                  </div>
+                  <span className="text-[11px] text-amber-700 font-mono">Real-time Check-In %</span>
+                </div>
               </div>
-              <span className="text-[11px] text-amber-700 font-mono">Real-time Check-In %</span>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* PRIMARY CHECK-IN ACTION BAR */}
           <div className="p-6 rounded-3xl bg-white border border-[#E9D3D0] shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -1008,18 +1257,18 @@ export const EventDetailPage: React.FC = () => {
                 <QrCode className="w-5 h-5 text-emerald-600" /> 1-Tap Guest Gate Check-In
               </h3>
               <p className="text-xs text-[#7A6B6C] font-mono">
-                Scan guest QR passes using your mobile camera or enter pass codes manually.
+                Scan guest QR passes using your mobile camera, enter pass codes manually, or launch the Live TV Welcome Screen.
               </p>
             </div>
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setIsScannerModalOpen(true)}
                 className="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 hover:from-emerald-700 hover:to-emerald-900 text-white font-extrabold text-xs shadow-lg hover:scale-105 transition-transform flex items-center justify-center gap-2 border border-emerald-400/40"
               >
                 <Camera className="w-4 h-4 text-amber-200 animate-pulse" />
-                <span>📷 SCAN GUEST QR (1-TAP)</span>
+                <span>📷 SCAN GUEST QR</span>
               </button>
 
               <button
@@ -1028,10 +1277,69 @@ export const EventDetailPage: React.FC = () => {
                 className="px-5 py-3.5 rounded-2xl bg-[#FAF7F5] border border-[#E9D3D0] hover:bg-[#F2E5E2] text-[#302829] font-extrabold text-xs flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Key className="w-4 h-4 text-[#9E6F6D]" />
-                <span>Enter Pass Code</span>
+                <span>Pass Code</span>
               </button>
+
+              <Link
+                to={`/welcome/${id}`}
+                target="_blank"
+                className="px-5 py-3.5 rounded-2xl bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-900 font-extrabold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+              >
+                <Tv className="w-4 h-4 text-purple-700" />
+                <span>Launch TV Screen</span>
+              </Link>
             </div>
           </div>
+
+          {/* RECENT ARRIVALS LIVE STREAM WIDGET */}
+          {(() => {
+            const checkedInGuests = guests
+              .filter((g) => g.checked_in)
+              .sort((a, b) => {
+                const timeA = a.checked_in_at ? new Date(a.checked_in_at).getTime() : 0;
+                const timeB = b.checked_in_at ? new Date(b.checked_in_at).getTime() : 0;
+                return timeB - timeA;
+              });
+
+            if (checkedInGuests.length === 0) return null;
+
+            return (
+              <div className="p-4 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 shadow-sm space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="font-extrabold text-emerald-900 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                    LIVE RECENT ARRIVALS ({checkedInGuests.length})
+                  </span>
+                  <span className="text-emerald-700 text-[11px]">
+                    Auto-syncing every 10s
+                  </span>
+                </div>
+
+                <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
+                  {checkedInGuests.slice(0, 8).map((g) => (
+                    <div
+                      key={g.id}
+                      onClick={() => setSelectedAttendanceGuest(g)}
+                      className="px-3.5 py-2 rounded-2xl bg-white border border-emerald-200 shadow-xs shrink-0 cursor-pointer hover:border-emerald-400 transition-colors flex items-center gap-2"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <div className="text-left">
+                        <span className="font-serif font-extrabold text-xs text-[#302829] block">
+                          {g.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-[#8C7E80] block">
+                          {g.checked_in_at
+                            ? new Date(g.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : 'Checked in'}
+                          {' • '}{(g.adults_count || 1) + (g.children_count || 0)} Guests
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* DESKTOP TWO-PANE ATTENDANCE DASHBOARD */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1441,76 +1749,350 @@ export const EventDetailPage: React.FC = () => {
       {/* EDIT GUEST MODAL */}
       {editingGuest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md glass-panel p-6 rounded-3xl gold-border shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-serif text-lg font-bold text-white">Edit Guest Details</h3>
-              <button onClick={() => setEditingGuest(null)} className="text-slate-400 hover:text-white">
+          <div className="w-full max-w-lg bg-white p-6 rounded-3xl border border-[#E9D3D0] shadow-2xl space-y-4 text-[#302829]">
+            <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-3">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-[#9E6F6D]" />
+                <h3 className="font-serif text-lg font-bold text-[#302829]">Edit Guest Details</h3>
+              </div>
+              <button onClick={() => setEditingGuest(null)} className="text-[#8C7E80] hover:text-[#302829]">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1">Full Name</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="sm:col-span-2">
+                <label className="block text-[#7A6B6C] font-semibold mb-1">Full Name *</label>
                 <input
                   type="text"
+                  required
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-[#0D0205] border border-amber-500/30 text-white text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">WhatsApp Phone Number</label>
+                <label className="block text-[#7A6B6C] font-semibold mb-1">WhatsApp Phone</label>
                 <input
                   type="tel"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-[#0D0205] border border-amber-500/30 text-white text-sm"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Guest Type / Relationship</label>
-                <select
-                  value={editRel}
-                  onChange={(e) => setEditRel(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-[#0D0205] border border-amber-500/30 text-white text-sm"
-                >
-                  <option value="General">General</option>
-                  <option value="Special">Special</option>
-                  <option value="VIP">VIP</option>
-                  <option value="Family">Family</option>
-                  <option value="Relatives">Relatives</option>
-                  <option value="Friends">Friends</option>
-                  <option value="Colleagues">Colleagues</option>
-                </select>
+                <label className="block text-[#7A6B6C] font-semibold mb-1">Email Address</label>
+                <input
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
+                />
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1">Group Name</label>
+                <label className="block text-[#7A6B6C] font-semibold mb-1">Guest Group</label>
                 <input
                   type="text"
                   value={editGroup}
                   onChange={(e) => setEditGroup(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-[#0D0205] border border-amber-500/30 text-white text-sm"
+                  placeholder="e.g. Family, VIP, Bride Side"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#7A6B6C] font-semibold mb-1">Relationship</label>
+                <input
+                  type="text"
+                  value={editRel}
+                  onChange={(e) => setEditRel(e.target.value)}
+                  placeholder="e.g. Cousin, Colleague, Friend"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[#7A6B6C] font-semibold mb-1">Language Preference</label>
+                <select
+                  value={editLanguage}
+                  onChange={(e) => setEditLanguage(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
+                >
+                  <option value="AUTO">Auto (Event Default)</option>
+                  <option value="HI">Hindi</option>
+                  <option value="EN">English</option>
+                  <option value="HINGLISH">Hinglish</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[#7A6B6C] font-semibold mb-1">Adults</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editAdults}
+                    onChange={(e) => setEditAdults(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[#7A6B6C] font-semibold mb-1">Children</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editChildren}
+                    onChange={(e) => setEditChildren(parseInt(e.target.value) || 0)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
+                  />
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[#7A6B6C] font-semibold mb-1">Special Notes / Seating / Dietary</label>
+                <textarea
+                  rows={2}
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="e.g. VIP front row seating, strictly Jain meal"
+                  className="w-full px-4 py-2 rounded-xl bg-[#FFFDFB] border border-[#E9D3D0] text-[#302829] text-xs font-semibold focus:outline-none focus:border-[#9E6F6D]"
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E9D3D0]">
               <button
                 onClick={() => setEditingGuest(null)}
-                className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-[#8C7E80] hover:text-[#302829]"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveEdit}
-                className="px-5 py-2 rounded-xl bg-amber-500 text-black font-bold text-xs shadow-md hover:bg-amber-400"
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#9E6F6D] via-[#875B59] to-[#9E6F6D] text-white font-extrabold text-xs shadow-md hover:scale-105 transition-all"
               >
                 Save Changes
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DUPLICATE GUEST WARNING & RESOLUTION MODAL */}
+      {isDuplicateModalOpen && duplicateMatchInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-white p-6 rounded-3xl border border-amber-300 shadow-2xl space-y-4 text-[#302829] animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-3">
+              <div className="p-3 rounded-2xl bg-amber-100 text-amber-800 shrink-0">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-serif text-lg font-extrabold text-[#302829]">Possible Duplicate Guest Found</h3>
+                <p className="text-xs text-[#7A6B6C] mt-1">
+                  {duplicateMatchInfo.warning_message || 'A guest with similar details is already in this celebration list.'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsDuplicateModalOpen(false);
+                  setDuplicateCandidate(null);
+                  setDuplicateMatchInfo(null);
+                }}
+                className="text-[#8C7E80] hover:text-[#302829]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {duplicateMatchInfo.matched_guest && (
+              <div className="p-4 rounded-2xl bg-[#FAF7F3] border border-[#E9D3D0] space-y-2 text-xs">
+                <div className="font-mono text-[10px] uppercase font-bold text-[#8C7E80]">Existing Guest Record</div>
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-sm text-[#302829]">{duplicateMatchInfo.matched_guest.name}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-[#F2E5E2] text-[#9E6F6D] font-bold text-[10px]">
+                    {duplicateMatchInfo.matched_guest.group_name}
+                  </span>
+                </div>
+                <div className="text-[#7A6B6C] space-y-0.5">
+                  <div>📞 Phone: <strong>{duplicateMatchInfo.matched_guest.phone || 'None'}</strong></div>
+                  <div>✉️ Email: <strong>{duplicateMatchInfo.matched_guest.email || 'None'}</strong></div>
+                  <div>🎫 Pass Code: <strong className="font-mono text-[#9E6F6D]">{duplicateMatchInfo.matched_guest.pass_code}</strong></div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2 pt-2">
+              <div className="text-[11px] font-bold text-[#51484A]">What would you like to do?</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmMerge}
+                  className="px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-extrabold text-xs shadow-md transition-all flex flex-col items-start gap-0.5"
+                >
+                  <span className="font-extrabold">✓ Merge / Update Details</span>
+                  <span className="text-[10px] text-emerald-100 font-normal">Update existing contact without creating duplicate</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmKeepSeparate}
+                  className="px-4 py-3 rounded-2xl bg-[#FAF7F3] hover:bg-[#F2E5E2] text-[#9E6F6D] border border-[#E9D3D0] font-extrabold text-xs shadow-sm transition-all flex flex-col items-start gap-0.5"
+                >
+                  <span className="font-extrabold">+ Keep Separate Person</span>
+                  <span className="text-[10px] text-[#7A6B6C] font-normal">Create a new guest record with distinct pass</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="text-right pt-2 border-t border-[#E9D3D0]">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDuplicateModalOpen(false);
+                  setDuplicateCandidate(null);
+                  setDuplicateMatchInfo(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-[#8C7E80] hover:text-[#302829]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2-STAGE BULK IMPORT PREVIEW & CONFIRMATION MODAL */}
+      {isImportModalOpen && importPreviewData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-2xl bg-white p-6 rounded-3xl border border-[#E9D3D0] shadow-2xl space-y-5 text-[#302829] max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-[#9E6F6D]" />
+                <div>
+                  <h3 className="font-serif text-lg font-extrabold text-[#302829]">Import Contacts Preview & Validation</h3>
+                  <p className="text-xs text-[#7A6B6C]">Review contacts before adding them to your celebration</p>
+                </div>
+              </div>
+              <button onClick={() => setIsImportModalOpen(false)} className="text-[#8C7E80] hover:text-[#302829]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Validation KPI Breakdown */}
+            <div className="grid grid-cols-3 gap-3 shrink-0">
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-center">
+                <div className="text-2xl font-extrabold text-emerald-800 font-serif">{importPreviewData.valid_count}</div>
+                <div className="text-[10px] font-mono font-bold uppercase text-emerald-700">Valid Contacts</div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-center">
+                <div className="text-2xl font-extrabold text-amber-800 font-serif">{importPreviewData.duplicates_count}</div>
+                <div className="text-[10px] font-mono font-bold uppercase text-amber-700">Duplicates Detected</div>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-center">
+                <div className="text-2xl font-extrabold text-rose-800 font-serif">{importPreviewData.invalid_count}</div>
+                <div className="text-[10px] font-mono font-bold uppercase text-rose-700">Invalid Rows</div>
+              </div>
+            </div>
+
+            {/* Duplicate Policy Selection */}
+            {importPreviewData.duplicates_count > 0 && (
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2 text-xs shrink-0">
+                <div className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-amber-700" />
+                  <span>How should we handle the {importPreviewData.duplicates_count} duplicate contact{importPreviewData.duplicates_count !== 1 ? 's' : ''}?</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  {[
+                    { id: 'SKIP', title: 'Skip Duplicates', desc: 'Do not import duplicates' },
+                    { id: 'MERGE', title: 'Merge / Update', desc: 'Update existing records' },
+                    { id: 'KEEP_SEPARATE', title: 'Keep Separate', desc: 'Create new guests' },
+                  ].map((pol) => (
+                    <label
+                      key={pol.id}
+                      onClick={() => setImportDuplicatePolicy(pol.id as any)}
+                      className={`p-2.5 rounded-xl border cursor-pointer transition-all flex flex-col ${
+                        importDuplicatePolicy === pol.id
+                          ? 'bg-amber-100/90 border-amber-400 font-bold text-amber-950 shadow-sm'
+                          : 'bg-white/80 border-amber-200 text-[#51484A] hover:bg-white'
+                      }`}
+                    >
+                      <span className="text-xs">{pol.title}</span>
+                      <span className="text-[10px] font-normal text-[#7A6B6C]">{pol.desc}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Scrollable Preview List */}
+            <div className="flex-1 overflow-y-auto space-y-2 border border-[#E9D3D0] rounded-2xl p-3 bg-[#FAF7F3]">
+              <div className="text-[11px] font-mono uppercase font-bold text-[#8C7E80] mb-1">
+                Preview Rows ({importPreviewData.total_parsed} total)
+              </div>
+              {importPreviewData.valid_items.slice(0, 15).map((item: any, idx: number) => (
+                <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-white border border-[#E9D3D0] text-xs">
+                  <div>
+                    <span className="font-bold text-[#302829]">{item.raw.name}</span>
+                    <span className="ml-2 text-[10px] text-[#7A6B6C] font-mono">{item.normalized_phone || item.raw.phone || 'No phone'}</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-bold text-[10px]">
+                    ✓ {item.raw.group_name || 'General'}
+                  </span>
+                </div>
+              ))}
+              {importPreviewData.duplicate_items.map((item: any, idx: number) => (
+                <div key={`dup-${idx}`} className="flex items-center justify-between p-2 rounded-xl bg-amber-50 border border-amber-200 text-xs">
+                  <div>
+                    <span className="font-bold text-amber-900">{item.raw.name}</span>
+                    <span className="ml-2 text-[10px] text-amber-700 font-mono">
+                      (Matches existing: {item.matched_existing_name || item.duplicate_type})
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 font-bold text-[10px]">
+                    Duplicate ({importDuplicatePolicy})
+                  </span>
+                </div>
+              ))}
+              {importPreviewData.invalid_items.map((item: any, idx: number) => (
+                <div key={`inv-${idx}`} className="flex items-center justify-between p-2 rounded-xl bg-rose-50 border border-rose-200 text-xs opacity-75">
+                  <span className="font-semibold text-rose-900">{item.raw.name || 'Unnamed'}</span>
+                  <span className="text-[10px] text-rose-700 italic">{item.error_reason || 'Invalid data'}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-[#E9D3D0] shrink-0">
+              <label className="flex items-center gap-2 text-xs text-[#9E6F6D] font-extrabold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={importSaveToMaster}
+                  onChange={(e) => setImportSaveToMaster(e.target.checked)}
+                  className="rounded border-[#E9D3D0] bg-[#FFFDFB] text-[#9E6F6D] focus:ring-[#9E6F6D]"
+                />
+                Also save to Master Address Book
+              </label>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-[#8C7E80] hover:text-[#302829]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={importLoading || importPreviewData.valid_count === 0}
+                  onClick={handleExecuteImport}
+                  className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 text-white font-extrabold text-xs shadow-lg hover:scale-105 transition-all disabled:opacity-50"
+                >
+                  {importLoading ? 'Importing...' : `Import ${importPreviewData.valid_count + (importDuplicatePolicy !== 'SKIP' ? importPreviewData.duplicates_count : 0)} Contacts`}
+                </button>
+              </div>
             </div>
           </div>
         </div>

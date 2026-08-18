@@ -32,6 +32,10 @@ async def init_db():
         # Auto-migrate SQLite schema for legacy local database files if new columns are missing
         if "sqlite" in settings.async_database_url:
             cols_to_add = [
+                ("guests", "group_id", "VARCHAR"),
+                ("guests", "master_contact_id", "VARCHAR"),
+                ("guests", "language", "VARCHAR DEFAULT 'AUTO'"),
+                ("guests", "notes", "TEXT"),
                 ("guests", "invitation_token", "VARCHAR"),
                 ("guests", "delivery_status", "VARCHAR DEFAULT 'SENT'"),
                 ("guests", "delivered_at", "DATETIME"),
@@ -78,6 +82,11 @@ async def init_db():
                 ("broadcast_messages", "read_at", "DATETIME"),
                 ("broadcast_messages", "failed_at", "DATETIME"),
                 ("broadcast_messages", "updated_at", "DATETIME"),
+                ("gallery_items", "uploaded_by_name", "VARCHAR"),
+                ("gallery_items", "status", "VARCHAR DEFAULT 'PENDING'"),
+                ("gallery_items", "is_featured", "BOOLEAN DEFAULT 0"),
+                ("gallery_items", "file_size_bytes", "INTEGER"),
+                ("gallery_items", "mime_type", "VARCHAR"),
             ]
             for tbl_name, col_name, col_type in cols_to_add:
                 try:

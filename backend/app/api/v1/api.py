@@ -12,12 +12,16 @@ from app.api.v1.endpoints import (
     campaigns,
     whatsapp_campaigns,
     webhooks,
+    memories,
+    concierge,
 )
 
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 api_router.include_router(events.router, prefix="/events", tags=["Events"])
+api_router.include_router(concierge.router, tags=["AI Event Concierge"])
+api_router.include_router(memories.router, tags=["Memories, Wishes & Celebration Story"])
 api_router.include_router(campaigns.router, tags=["Broadcasting & Multi-Channel Messaging"])
 api_router.include_router(guests.router, tags=["Guests"])
 api_router.include_router(master_contacts.router, tags=["Master Contacts"])

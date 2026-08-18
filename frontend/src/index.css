@@ -1,8 +1,57 @@
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Nimantran Warm Luxury Brand Tokens */
+  --color-canvas: #FAF7F2;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #F4EFE6;
+  --color-surface-elevated: #FFFDF9;
+  
+  --color-primary: #6B1D2F; /* Regal Burgundy Wine */
+  --color-primary-hover: #83243A;
+  --color-primary-light: #FBF0F2;
+  --color-primary-dark: #4A1220;
+
+  --color-gold: #C59B27; /* Warm Champagne Gold */
+  --color-gold-hover: #D4A832;
+  --color-gold-light: #FAF5E8;
+  --color-gold-dark: #9E7917;
+
+  --color-rose: #D98880; /* Soft Muted Rose */
+  --color-rose-light: #FCF1F0;
+  
+  --color-text-primary: #1F1B18; /* Deep Charcoal */
+  --color-text-secondary: #5E554D;
+  --color-text-muted: #91867D;
+  --color-text-inverse: #FFFFFF;
+
+  --color-border: #E8E0D5;
+  --color-border-subtle: #F0E9DF;
+  --color-border-focus: #6B1D2F;
+
+  --color-success: #1B8755;
+  --color-success-light: #EBF8F1;
+  --color-warning: #D97706;
+  --color-warning-light: #FEF3C7;
+  --color-error: #DC2626;
+  --color-error-light: #FEE2E2;
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 2px 6px rgba(31, 27, 24, 0.04);
+  --shadow-md: 0 6px 18px rgba(31, 27, 24, 0.06), 0 1px 3px rgba(31, 27, 24, 0.03);
+  --shadow-lg: 0 14px 34px rgba(31, 27, 24, 0.08), 0 2px 6px rgba(31, 27, 24, 0.04);
+  --shadow-xl: 0 24px 50px rgba(31, 27, 24, 0.12), 0 4px 12px rgba(31, 27, 24, 0.06);
+}
 
 @layer base {
   html {
@@ -10,18 +59,21 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
     -webkit-tap-highlight-color: transparent;
+    background-color: var(--color-canvas);
+    color: var(--color-text-primary);
   }
 
   body {
-    background-color: #0A1128;
-    color: #FFFDFC;
     min-height: 100vh;
-    font-family: 'Manrope', 'Inter', sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Manrope', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--color-canvas);
+    color: var(--color-text-primary);
     overflow-x: hidden;
     touch-action: manipulation;
+    letter-spacing: -0.01em;
   }
 
-  /* Prevent automatic mobile input zoom */
+  /* Prevent automatic mobile input zoom and optimize tap targets */
   input, select, textarea, button {
     touch-action: manipulation;
   }
@@ -32,12 +84,17 @@
     }
   }
 
-  h1, h2, h3, .font-serif {
+  h1, h2, h3, h4, .font-serif {
     font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+    letter-spacing: -0.015em;
   }
 }
 
-/* Mobile Safe Area Inset Utility Classes */
+/* =========================================================================
+   NIMANTRAN DESIGN SYSTEM UTILITIES
+   ========================================================================= */
+
+/* Mobile Safe Area Inset Helpers */
 .pb-safe {
   padding-bottom: max(16px, env(safe-area-inset-bottom, 16px));
 }
@@ -50,7 +107,7 @@
   margin-bottom: max(16px, env(safe-area-inset-bottom, 16px));
 }
 
-/* Hide scrollbar on mobile while keeping smooth scrollability */
+/* No Scrollbar Utility */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -59,59 +116,96 @@
   scrollbar-width: none;
 }
 
-/* NIMANTRAN Smooth Performance Utilities */
-.transform-gpu {
-  transform: translateZ(0);
-  will-change: transform;
+/* Premium Surface Panels */
+.surface-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.glass-panel {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(216, 181, 176, 0.35);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+.surface-card-hover {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.surface-card-hover:hover {
+  border-color: #D98880;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
-.glass-floating-card {
-  background: rgba(15, 23, 42, 0.92);
+/* Glassmorphism overlays for Modals & Floating Bars */
+.glass-surface {
+  background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(201, 170, 120, 0.4);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(232, 224, 213, 0.8);
+  box-shadow: var(--shadow-lg);
 }
 
-.gold-gradient-text {
-  background: linear-gradient(135deg, #FFF5C0 0%, #FFD700 50%, #C9AA78 100%);
+.glass-surface-dark {
+  background: rgba(26, 21, 23, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(197, 155, 39, 0.25);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+/* Gradient Text Embellishments */
+.gold-text-gradient {
+  background: linear-gradient(135deg, #9E7917 0%, #C59B27 50%, #D4A832 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.champagne-gradient-text {
-  background: linear-gradient(135deg, #FBBF24 0%, #C9AA78 60%, #FFFFFF 100%);
+.wine-text-gradient {
+  background: linear-gradient(135deg, #4A1220 0%, #6B1D2F 60%, #9E354D 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.editorial-shadow {
-  box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.5);
+/* Subtle Shimmer for Skeletons & AI Loading */
+@keyframes luxury-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
-.rose-border {
-  border: 1px solid rgba(216, 181, 176, 0.45);
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #F4EFE6 25%, #FFFDF9 50%, #F4EFE6 75%);
+  background-size: 200% 100%;
+  animation: luxury-shimmer 2s infinite ease-in-out;
+  border-radius: var(--radius-sm);
 }
 
-/* Custom Smooth Scrollbars */
+/* Smooth Touch Buttons */
+.touch-target-48 {
+  min-height: 48px;
+  min-width: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Custom Nimantran Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0A1128;
+  background: #FAF7F2;
 }
 ::-webkit-scrollbar-thumb {
-  background: #C9AA78;
+  background: #D9CFC4;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #FFD700;
+  background: #C59B27;
 }

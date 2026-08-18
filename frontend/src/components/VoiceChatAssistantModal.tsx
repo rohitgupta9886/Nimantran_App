@@ -82,6 +82,7 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
   const [phase, setPhase] = useState<'SLOT_FILLING' | 'READY_TO_CREATE' | 'EVENT_CREATED' | 'GUEST_VERIFICATION' | 'DISPATCHED'>('SLOT_FILLING');
 
   const [createdEvent, setCreatedEvent] = useState<any>(null);
+  const [pendingConciergeAction, setPendingConciergeAction] = useState<any>(null);
   const [masterContacts, setMasterContacts] = useState<any[]>([]);
   const [loadedGuests, setLoadedGuests] = useState<any[]>([]);
   const [editingGuestId, setEditingGuestId] = useState<string | null>(null);
@@ -97,7 +98,7 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
   // Auto-scroll chat to bottom
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, phase, loadedGuests]);
+  }, [messages, phase, loadedGuests, pendingConciergeAction]);
 
   // Reset chat screen completely whenever modal opens
   useEffect(() => {
@@ -267,6 +268,42 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
     setLoading(true);
 
     try {
+      // 1. Check if user is invoking Concierge intelligent layer actions
+      const isConciergeAction =
+        /upload|colour|color|badal|dobara|resend|confirm|kitne|reminder|bhejo|whatsapp|hindi|english|wording|guests hain|kya karna|sabko|attendance|status/i.test(textToSend);
+
+      if (isConciergeAction || createdEvent?.id) {
+        try {
+          const conciergeRes = await apiFetch<any>('/concierge/chat', {
+            method: 'POST',
+            body: JSON.stringify({
+              message: textToSend,
+              event_id: createdEvent?.id,
+            }),
+          });
+          const cData = conciergeRes?.data;
+          if (cData && cData.reply_text) {
+            setMessages((prev) => [...prev, { sender: 'ai', text: cData.reply_text }]);
+            speakAiResponse(cData.reply_text);
+            if (cData.requires_confirmation && cData.structured_action) {
+              setPendingConciergeAction({
+                action_id: cData.structured_action.action_id,
+                action_type: cData.structured_action.action_type,
+                preview_data: cData.structured_action.preview_data,
+                reply_text: cData.reply_text,
+              });
+            } else {
+              setPendingConciergeAction(null);
+            }
+            setLoading(false);
+            return;
+          }
+        } catch (cErr) {
+          console.warn('Concierge chat fallback to slot filler:', cErr);
+        }
+      }
+
+      // 2. Default LangGraph converse slot-filling flow
       const res = await apiFetch<any>('/events/ai-converse-langgraph', {
         method: 'POST',
         body: JSON.stringify({
@@ -300,6 +337,31 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
         ? 'धन्यवाद जी! 🙏 आपकी सेलिब्रेशन डिटेल्स दर्ज कर ली गई हैं।'
         : 'Thank you! 🙏 Your celebration details have been recorded.';
       setMessages((prev) => [...prev, { sender: 'ai', text: fallbackReply }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmConciergeAction = async (actionId: string, confirmed: boolean) => {
+    setLoading(true);
+    try {
+      const res = await apiFetch<any>('/concierge/confirm-action', {
+        method: 'POST',
+        body: JSON.stringify({
+          action_id: actionId,
+          confirmed,
+          event_id: createdEvent?.id,
+        }),
+      });
+      const data = res?.data;
+      setPendingConciergeAction(null);
+      if (data && data.reply_text) {
+        setMessages((prev) => [...prev, { sender: 'ai', text: data.reply_text }]);
+        speakAiResponse(data.reply_text);
+      }
+    } catch (err: any) {
+      console.error('Confirm concierge action error:', err);
+      alert(err.message || 'Action failed');
     } finally {
       setLoading(false);
     }
@@ -486,6 +548,17 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
     }
   };
 
+  // Escape key handler for accessible modal dismissal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        handleCloseAndSaveHistory();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, messages]);
+
   if (!isOpen) return null;
 
   // Extract display names for chips
@@ -494,7 +567,12 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
   const celebrantValue = memory?.celebrant_name || memory?.title || null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Nimantran AI Concierge"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto"
+    >
       <div className="bg-[#FFFDFC] border-2 border-[#E9D3D0] rounded-3xl max-w-4xl w-full max-h-[96vh] h-[92vh] flex flex-col justify-between p-4 sm:p-6 text-[#211B1C] shadow-2xl relative my-auto">
         
         {/* TOP HEADER: Warm & Friendly Concierge */}
@@ -520,7 +598,8 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
                 }
                 setIsMuted(!isMuted);
               }}
-              className={`p-2 rounded-xl border transition-colors flex items-center gap-1 text-xs font-bold ${
+              aria-label={isMuted ? 'Unmute voice narration' : 'Mute voice narration'}
+              className={`min-h-[44px] min-w-[44px] p-2.5 rounded-xl border transition-colors flex items-center justify-center gap-1 text-xs font-bold focus-visible:ring-2 focus-visible:ring-[#9E6F6D] focus-visible:outline-none ${
                 isMuted
                   ? 'bg-rose-50 text-rose-700 border-rose-200'
                   : 'bg-[#FAF7F3] text-[#9E6F6D] border-[#E9D3D0] hover:bg-[#F2E5E2]'
@@ -543,7 +622,8 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
             <button
               type="button"
               onClick={() => setShowHistoryModal(!showHistoryModal)}
-              className="p-2 rounded-xl bg-[#FAF7F3] hover:bg-[#F2E5E2] text-[#9E6F6D] border border-[#E9D3D0] transition-colors flex items-center gap-1 text-xs font-bold"
+              aria-label="View saved consultation history"
+              className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl bg-[#FAF7F3] hover:bg-[#F2E5E2] text-[#9E6F6D] border border-[#E9D3D0] transition-colors flex items-center justify-center gap-1 text-xs font-bold focus-visible:ring-2 focus-visible:ring-[#9E6F6D] focus-visible:outline-none"
               title="View Chat History"
             >
               <History className="w-4 h-4" />
@@ -553,7 +633,8 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
             <button
               type="button"
               onClick={handleCloseAndSaveHistory}
-              className="p-2 rounded-xl hover:bg-rose-50 text-[#8C7E80] hover:text-rose-600 border border-transparent hover:border-rose-200 transition-colors"
+              aria-label="Close AI Concierge"
+              className="min-h-[44px] min-w-[44px] p-2.5 rounded-xl hover:bg-rose-50 text-[#8C7E80] hover:text-rose-600 border border-transparent hover:border-rose-200 transition-colors flex items-center justify-center focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
               title="Close & Save"
             >
               <X className="w-5 h-5" />
@@ -759,6 +840,42 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
               </div>
             </div>
           ))}
+
+          {/* 🌟 PHASE 13 CONCIERGE INTERACTIVE CONFIRMATION CARD */}
+          {pendingConciergeAction && (
+            <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 shadow-md space-y-3 my-2 animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+                <span className="text-xs font-serif font-extrabold text-amber-900 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600" /> Action Confirmation / पुष्टि आवश्यक है
+                </span>
+                <span className="text-[10px] font-mono font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
+                  Estimated: {pendingConciergeAction.preview_data?.target_count || 1} Messages
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-amber-950 font-medium whitespace-pre-wrap">
+                {pendingConciergeAction.reply_text}
+              </p>
+              <div className="flex items-center gap-2 pt-1 flex-wrap sm:flex-nowrap">
+                <button
+                  type="button"
+                  onClick={() => handleConfirmConciergeAction(pendingConciergeAction.action_id, true)}
+                  disabled={loading}
+                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs flex items-center gap-1.5 shadow-sm transition-transform hover:scale-[1.02]"
+                >
+                  <Send className="w-3.5 h-3.5" /> [Send Now]
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmConciergeAction(pendingConciergeAction.action_id, false)}
+                  disabled={loading}
+                  className="px-4 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-xs flex items-center gap-1.5 border border-rose-300 transition-transform hover:scale-[1.02]"
+                >
+                  <X className="w-3.5 h-3.5" /> [Cancel]
+                </button>
+              </div>
+            </div>
+          )}
+
           <div ref={chatBottomRef} />
         </div>
 
@@ -1063,31 +1180,66 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
           </div>
         )}
 
-        {/* 🌟 1-TAP QUICK RESPONSE BUBBLES (Elderly-Friendly) */}
+        {/* 🌟 1-TAP QUICK RESPONSE BUBBLES & CONCIERGE PROMPTS (Elderly-Friendly) */}
         <div className="flex items-center gap-1.5 overflow-x-auto py-1.5 custom-scrollbar text-xs">
           <span className="text-[10px] font-bold text-[#8C7E80] uppercase tracking-wider shrink-0 mr-1">
-            ⚡ Quick Answers:
+            ⚡ Concierge Prompts:
           </span>
+          <button
+            type="button"
+            onClick={() => handleSendMessage('Kitne guests confirm hain?')}
+            className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#D8B5B0] hover:border-[#9E6F6D] hover:bg-[#F2E5E2] font-bold text-[#302829] shrink-0 transition-all flex items-center gap-1"
+          >
+            📊 Kitne guests confirm hain?
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSendMessage('Sabko WhatsApp bhej do')}
+            className="px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 font-bold text-emerald-900 shrink-0 transition-all flex items-center gap-1"
+          >
+            💬 Sabko WhatsApp bhej do
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSendMessage('RSVP pending guests ko reminder bhejo')}
+            className="px-3 py-1.5 rounded-full bg-amber-50 border border-amber-300 hover:bg-amber-100 font-bold text-amber-900 shrink-0 transition-all flex items-center gap-1"
+          >
+            ⏰ RSVP pending reminder
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSendMessage('Wedding mein 250 guests hain, kya karna chahiye?')}
+            className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#D8B5B0] hover:border-[#9E6F6D] hover:bg-[#F2E5E2] font-bold text-[#302829] shrink-0 transition-all flex items-center gap-1"
+          >
+            💡 250 Guests Advice
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSendMessage('Mujhe Hindi invitation chahiye')}
+            className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#D8B5B0] hover:border-[#9E6F6D] hover:bg-[#F2E5E2] font-bold text-[#302829] shrink-0 transition-all flex items-center gap-1"
+          >
+            📜 Hindi Invitation
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSendMessage('Guest list upload karna hai')}
+            className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#D8B5B0] hover:border-[#9E6F6D] hover:bg-[#F2E5E2] font-bold text-[#302829] shrink-0 transition-all flex items-center gap-1"
+          >
+            👥 Guest List Upload
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSendMessage('Invitation ka colour change karna hai')}
+            className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#D8B5B0] hover:border-[#9E6F6D] hover:bg-[#F2E5E2] font-bold text-[#302829] shrink-0 transition-all flex items-center gap-1"
+          >
+            🎨 Change Colour
+          </button>
           <button
             type="button"
             onClick={() => handleSendMessage('Shaadi / Wedding card banana hai 💍')}
             className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#D8B5B0] hover:border-[#9E6F6D] hover:bg-[#F2E5E2] font-bold text-[#302829] shrink-0 transition-all"
           >
             💍 Shaadi / Wedding
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSendMessage('Birthday celebration card banana hai 🎂')}
-            className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#D8B5B0] hover:border-[#9E6F6D] hover:bg-[#F2E5E2] font-bold text-[#302829] shrink-0 transition-all"
-          >
-            🎂 Birthday Party
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSendMessage('Mundan sanskar ceremony 👶')}
-            className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#D8B5B0] hover:border-[#9E6F6D] hover:bg-[#F2E5E2] font-bold text-[#302829] shrink-0 transition-all"
-          >
-            👶 Mundan Sanskar
           </button>
           <button
             type="button"
@@ -1117,7 +1269,8 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
           <button
             type="button"
             onClick={() => setShowCalendar(!showCalendar)}
-            className="px-3 py-3 rounded-2xl bg-[#F2E5E2] hover:bg-[#E9D3D0] text-[#302829] border border-[#D8B5B0] font-bold text-xs shrink-0 flex items-center gap-1"
+            aria-label="Open Visual Calendar Grid"
+            className="min-h-[48px] px-3.5 py-3 rounded-2xl bg-[#F2E5E2] hover:bg-[#E9D3D0] text-[#302829] border border-[#D8B5B0] font-bold text-xs shrink-0 flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-[#9E6F6D] focus-visible:outline-none"
             title="Open Visual Calendar Grid"
           >
             <Calendar className="w-4 h-4 text-[#9E6F6D]" />
@@ -1127,7 +1280,8 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
           <button
             type="button"
             onClick={toggleListening}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-md ${
+            aria-label={isListening ? 'Stop voice recording' : 'Start speaking in Hindi or English'}
+            className={`min-w-[48px] min-h-[48px] w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all shadow-md focus-visible:ring-2 focus-visible:ring-[#9E6F6D] focus-visible:outline-none ${
               isListening
                 ? 'bg-rose-600 text-white animate-pulse ring-4 ring-rose-500/40'
                 : 'bg-[#9E6F6D] text-white hover:bg-[#875B59]'
@@ -1142,15 +1296,17 @@ export const VoiceChatAssistantModal: React.FC<VoiceChatAssistantModalProps> = (
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            aria-label="Type message or instruction for AI Concierge"
             placeholder={isListening ? '🔴 Bolna shuru karein (Recording...)' : 'Type or speak: "Rohit aur Neha ki shaadi hai 25 Dec ko..."'}
-            className="flex-1 px-4 py-3 rounded-2xl bg-[#FAF7F3] border-2 border-[#E9D3D0] text-[#211B1C] font-bold text-sm placeholder:text-[#8C7E80] placeholder:font-normal focus:border-[#9E6F6D] outline-none"
+            className="flex-1 min-h-[48px] px-4 py-3 rounded-2xl bg-[#FAF7F3] border-2 border-[#E9D3D0] text-[#211B1C] font-bold text-sm placeholder:text-[#8C7E80] placeholder:font-normal focus:border-[#9E6F6D] focus-visible:ring-2 focus-visible:ring-[#9E6F6D] outline-none"
           />
 
           <button
             type="button"
             onClick={() => handleSendMessage()}
             disabled={!inputText.trim() || loading}
-            className="w-12 h-12 rounded-2xl bg-[#9E6F6D] hover:bg-[#875B59] text-white font-bold flex items-center justify-center shrink-0 shadow-md transition-transform hover:scale-105 disabled:opacity-40"
+            aria-label="Send message to AI Concierge"
+            className="min-w-[48px] min-h-[48px] w-12 h-12 rounded-2xl bg-[#9E6F6D] hover:bg-[#875B59] text-white font-bold flex items-center justify-center shrink-0 shadow-md transition-transform hover:scale-105 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-[#9E6F6D] focus-visible:outline-none"
             title="Send Message"
           >
             <Send className="w-5 h-5 text-white" />

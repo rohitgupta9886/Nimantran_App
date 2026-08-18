@@ -4,7 +4,8 @@ from app.models.guest import Guest, GuestGroup, RSVP, RSVPStatus, GuestCategory
 from app.models.master_contact import MasterContact
 from app.models.qr_pass import GuestEntryPass, Checkin, PassStatus
 from app.models.welcome import WelcomeMessage, WelcomeScreenSession
-from app.models.gallery import GalleryAlbum, GalleryItem, VisibilityLevel
+from app.models.gallery import GalleryAlbum, GalleryItem, VisibilityLevel, ModerationStatus
+from app.models.wish import CelebrationWish
 from app.models.story import Story, StoryTimelineItem
 from app.models.credit import Plan, Subscription, CreditWallet, CreditTransaction, AIUsage, TransactionType
 from app.models.campaign import (
@@ -45,6 +46,8 @@ __all__ = [
     "GalleryAlbum",
     "GalleryItem",
     "VisibilityLevel",
+    "ModerationStatus",
+    "CelebrationWish",
     "Story",
     "StoryTimelineItem",
     "Plan",

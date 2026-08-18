@@ -537,3 +537,98 @@ class GoogleGeminiAIProvider(AIProvider):
             return parsed
 
         return await self.mock_fallback.generate_ai_card_on_the_fly(event_type, title, host_name, venue, date_str)
+
+    async def generate_celebration_story(
+        self,
+        event_facts: Dict[str, Any],
+        approved_wishes: List[Dict[str, Any]],
+        approved_memories: List[Dict[str, Any]],
+        attendance_summary: Dict[str, Any],
+        style: str = "EMOTIONAL_ROYAL",
+    ) -> Dict[str, Any]:
+        title = event_facts.get("title", "Celebration")
+        host_name = event_facts.get("host_name", "Host")
+        venue_name = event_facts.get("venue_name", "Celebration Venue")
+        date_str = event_facts.get("date_str", "Celebration Date")
+        event_type = event_facts.get("event_type", "CELEBRATION")
+        checked_in = attendance_summary.get("checked_in_count", 0)
+        total_guests = attendance_summary.get("total_guests", 0)
+
+        wishes_summary = "\n".join([f"- \"{w.get('message')}\" from {w.get('sender_name')} ({w.get('relationship', 'Guest')})" for w in approved_wishes[:10]])
+        memories_summary = "\n".join([f"- Photo with caption: \"{m.get('caption')}\"" for m in approved_memories if m.get('caption')][:10])
+
+        prompt = f"""
+        You are an elite, poetic Indian storyteller creating a post-event digital celebration memory story.
+        CRITICAL RULES:
+        - You MUST strictly base your narrative on the provided factual event parameters.
+        - NEVER hallucinate or invent non-existent guests, fictitious milestones, or fake attendance numbers.
+        - Factual Attendance Count: {checked_in} guests checked in out of {total_guests} total invited.
+        - Event Title: {title}
+        - Host: {host_name}
+        - Venue: {venue_name}
+        - Date: {date_str}
+        - Event Type: {event_type}
+
+        Approved Guest Wishes:
+        {wishes_summary or "Heartfelt blessings from all attending families."}
+
+        Approved Memories:
+        {memories_summary or "Precious photographic moments captured across ceremonies."}
+
+        Tone / Style: {style}
+
+        Generate a JSON object with:
+        - "title": Celebration summary title
+        - "story_hindi": Poetic Hindi celebration narrative in Devanagari script (3-4 sentences celebrating the successful event and blessings)
+        - "story_english": Elegant English celebration narrative
+        - "highlights": Array of 3-4 factual milestone highlight bullet points
+        - "host_gratitude_note": Emotional thank-you note from {host_name} to the {checked_in} guests who attended
+
+        Return strictly raw JSON format.
+        """
+        raw_text = await self._call_gemini_raw(prompt, response_mime_type="application/json")
+        parsed = self._extract_and_parse_json(raw_text) if raw_text else None
+        if isinstance(parsed, dict) and "story_hindi" in parsed and "story_english" in parsed:
+            return {
+                "title": parsed.get("title", f"Celebration Chronicles: {title}"),
+                "event_type": event_type,
+                "host_name": host_name,
+                "venue_name": venue_name,
+                "date_str": date_str,
+                "attendance_grounding": attendance_summary,
+                "story_hindi": parsed.get("story_hindi"),
+                "story_english": parsed.get("story_english"),
+                "highlights": parsed.get("highlights", []),
+                "host_gratitude_note": parsed.get("host_gratitude_note", ""),
+                "approved_wishes_count": len(approved_wishes),
+                "approved_memories_count": len(approved_memories),
+            }
+
+        return await self.mock_fallback.generate_celebration_story(
+            event_facts, approved_wishes, approved_memories, attendance_summary, style
+        )
+
+    async def generate_memory_caption(
+        self, event_type: str, milestone_or_tag: str = "Celebration Moment", guest_name: Optional[str] = None
+    ) -> Dict[str, str]:
+        prompt = f"""
+        Generate a concise, bilingual (Hindi Devanagari + English) photo caption for a memory photo captured at a {event_type} celebration.
+        Milestone / Tag: {milestone_or_tag}
+        Guest: {guest_name or "Family & Friends"}
+
+        Return raw JSON with keys:
+        - "caption_hindi": 1-sentence poetic Hindi caption in Devanagari
+        - "caption_english": 1-sentence charming English caption
+        - "combined_caption": both lines separated by a newline
+        """
+        raw_text = await self._call_gemini_raw(prompt, response_mime_type="application/json")
+        parsed = self._extract_and_parse_json(raw_text) if raw_text else None
+        if isinstance(parsed, dict) and "caption_hindi" in parsed:
+            return parsed
+
+        return await self.mock_fallback.generate_memory_caption(event_type, milestone_or_tag, guest_name)
+
+    async def generate_attendance_thank_you(
+        self, event_facts: Dict[str, Any], attendance_summary: Dict[str, Any]
+    ) -> Dict[str, str]:
+        return await self.mock_fallback.generate_attendance_thank_you(event_facts, attendance_summary)

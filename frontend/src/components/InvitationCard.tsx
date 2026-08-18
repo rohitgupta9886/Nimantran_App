@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, lazy, Suspense } from 'react';
 import {
   Download,
   FileImage,
@@ -23,8 +23,9 @@ import { downloadCardAsJpeg, downloadCardAsPng, downloadCardAsPdf } from '../uti
 import { shareAiCardToWhatsApp } from '../utils/whatsappShare';
 import { downloadIcsCalendarFile } from '../utils/calendarExport';
 import getEventCardTheme, { EventThemeConfig } from '../utils/themeEngine';
-import { RsvpExperienceModal } from './RsvpExperienceModal';
 import { apiFetch } from '../services/api';
+
+const RsvpExperienceModal = lazy(() => import('./RsvpExperienceModal').then(m => ({ default: m.RsvpExperienceModal })));
 
 interface InvitationCardProps {
   event: {
@@ -510,15 +511,17 @@ export const InvitationCard: React.FC<InvitationCardProps> = ({
       </div>
 
       {/* WORLD-CLASS LUXURY RSVP EXPERIENCE MODAL */}
-      <RsvpExperienceModal
-        isOpen={isRsvpModalOpen}
-        onClose={() => setIsRsvpModalOpen(false)}
-        eventSlug={event.slug || ''}
-        eventTitle={event.title}
-        eventDate={event.start_date ? new Date(event.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date to be Announced'}
-        eventVenue={event.venue_name ? `${event.venue_name}, ${event.venue_address || ''}` : 'Celebration Venue'}
-        guestName={guest?.name}
-      />
+      <Suspense fallback={null}>
+        <RsvpExperienceModal
+          isOpen={isRsvpModalOpen}
+          onClose={() => setIsRsvpModalOpen(false)}
+          eventSlug={event.slug || ''}
+          eventTitle={event.title}
+          eventDate={event.start_date ? new Date(event.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date to be Announced'}
+          eventVenue={event.venue_name ? `${event.venue_name}, ${event.venue_address || ''}` : 'Celebration Venue'}
+          guestName={guest?.name}
+        />
+      </Suspense>
 
     </div>
   );

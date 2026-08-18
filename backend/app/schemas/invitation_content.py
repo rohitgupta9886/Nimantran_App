@@ -74,13 +74,15 @@ class CanonicalInvitationContent(BaseModel):
         cls,
         event: Any,
         ai_content: Optional[Dict[str, Any]] = None,
-        public_base_url: str = "http://localhost:5173",
+        public_base_url: Optional[str] = None,
         guest_token: Optional[str] = None,
     ) -> "CanonicalInvitationContent":
         """
         Synthesizes CanonicalInvitationContent strictly anchored in verified Event ground truth.
         """
-        base_url = public_base_url.rstrip("/")
+        from app.core.config import settings
+        effective_base = public_base_url or getattr(settings, "PUBLIC_BASE_URL", "http://localhost:5173")
+        base_url = effective_base.rstrip("/")
         slug_or_id = getattr(event, "slug", None) or str(event.id)
         
         if guest_token:

@@ -22,24 +22,21 @@ export const RsvpAnalyticsCard: React.FC<RsvpAnalyticsCardProps> = ({ eventId })
       .finally(() => setLoading(false));
   }, [eventId]);
 
-  const total = data?.total_guests || 500;
-  const confirmed = data?.confirmed_count || 312;
-  const confirmedPct = data?.confirmed_pct || 62;
-  const maybe = data?.maybe_count || 87;
-  const maybePct = data?.maybe_pct || 17;
-  const notAttending = data?.not_attending_count || 54;
-  const notAttendingPct = data?.not_attending_pct || 11;
-  const awaiting = data?.awaiting_count || 47;
-  const awaitingPct = data?.awaiting_pct || 9;
+  const totalInvited = data?.total_invited ?? data?.total_guests ?? 0;
+  const confirmed = data?.confirmed_count ?? data?.attending_count ?? 0;
+  const confirmedPct = data?.confirmed_pct ?? 0;
+  const maybe = data?.maybe_count ?? 0;
+  const maybePct = data?.maybe_pct ?? 0;
+  const notAttending = data?.not_attending_count ?? data?.declined_count ?? 0;
+  const notAttendingPct = data?.not_attending_pct ?? 0;
+  const awaiting = data?.awaiting_count ?? data?.pending_count ?? 0;
+  const awaitingPct = data?.awaiting_pct ?? 0;
+  const totalExpectedGuests = data?.total_expected_guests ?? confirmed;
 
-  const recentList = data?.recent_rsvps && data.recent_rsvps.length > 0 ? data.recent_rsvps : [
-    { id: '1', guest_name: 'Priya Sharma', status: 'CONFIRMED', adults_attending: 2, meal_preference: 'Veg', timestamp: '2 min ago' },
-    { id: '2', guest_name: 'Amit Verma', status: 'MAYBE', adults_attending: 1, meal_preference: 'Any', timestamp: '12 min ago' },
-    { id: '3', guest_name: 'Sneha Patel', status: 'CONFIRMED', adults_attending: 3, meal_preference: 'Veg', timestamp: '28 min ago' },
-    { id: '4', guest_name: 'Rohit Mehta', status: 'NOT_ATTENDING', adults_attending: 0, meal_preference: 'N/A', timestamp: '1 hour ago' },
-  ];
+  const recentList = data?.recent_rsvps && data.recent_rsvps.length > 0 ? data.recent_rsvps : [];
 
   const getInitials = (name: string) => {
+    if (!name) return 'G';
     const parts = name.trim().split(' ');
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return name.slice(0, 2).toUpperCase();
@@ -48,20 +45,36 @@ export const RsvpAnalyticsCard: React.FC<RsvpAnalyticsCardProps> = ({ eventId })
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       
-      {/* CARD 1: RSVP STATUS & DONUT CHART BREAKDOWN */}
+      {/* CARD 1: RSVP STATUS & HEADCOUNT BREAKDOWN */}
       <div className="p-6 rounded-3xl bg-[#FFFDFC] border border-[#E9D3D0] shadow-md space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="font-serif text-base font-bold text-[#302829] flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#9E6F6D]" /> RSVP Status
+            <Users className="w-5 h-5 text-[#9E6F6D]" /> RSVP & Attendance Readiness
           </h3>
           <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" /> Live
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" /> Live Sync
           </span>
+        </div>
+
+        {/* Headcount Banner */}
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-[#FAF7F3] to-[#F2E5E2] border border-[#E9D3D0] flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold block">
+              TOTAL EXPECTED GUESTS (HEADCOUNT)
+            </span>
+            <span className="font-serif text-2xl font-extrabold text-[#302829]">
+              {totalExpectedGuests} <span className="text-xs font-mono font-normal text-[#8C7E80]">people attending</span>
+            </span>
+          </div>
+          <div className="text-right font-mono text-xs text-[#8C7E80]">
+            <div>{totalInvited} Invited</div>
+            <div className="font-bold text-emerald-700">{confirmed} Confirmed</div>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-6">
           {/* Donut Progress Chart */}
-          <div className="relative w-36 h-36 flex items-center justify-center shrink-0">
+          <div className="relative w-32 h-32 flex items-center justify-center shrink-0">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
               {/* Background Ring */}
               <path
@@ -83,18 +96,18 @@ export const RsvpAnalyticsCard: React.FC<RsvpAnalyticsCardProps> = ({ eventId })
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="font-serif text-2xl font-extrabold text-[#302829]">{confirmedPct}%</span>
-              <span className="text-[10px] font-mono text-[#8C7E80] font-bold">
-                {confirmed} / {total} guest confirmed
+              <span className="font-serif text-xl font-extrabold text-[#302829]">{confirmedPct}%</span>
+              <span className="text-[9px] font-mono text-[#8C7E80] font-bold">
+                {confirmed} / {totalInvited}
               </span>
             </div>
           </div>
 
           {/* Breakdown List */}
-          <div className="flex-1 space-y-2.5 w-full text-xs font-mono">
+          <div className="flex-1 space-y-2 w-full text-xs font-mono">
             <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF7F3] border border-[#E9D3D0]">
               <span className="flex items-center gap-2 text-[#302829] font-bold">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" /> Confirmed
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" /> Attending
               </span>
               <span className="font-extrabold text-[#302829]">{confirmed} <span className="text-[#8C7E80] font-normal">({confirmedPct}%)</span></span>
             </div>
@@ -108,14 +121,14 @@ export const RsvpAnalyticsCard: React.FC<RsvpAnalyticsCardProps> = ({ eventId })
 
             <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF7F3] border border-[#E9D3D0]">
               <span className="flex items-center gap-2 text-[#302829] font-bold">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Not Attending
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Declined
               </span>
               <span className="font-extrabold text-[#302829]">{notAttending} <span className="text-[#8C7E80] font-normal">({notAttendingPct}%)</span></span>
             </div>
 
             <div className="flex items-center justify-between p-2 rounded-xl bg-[#FAF7F3] border border-[#E9D3D0]">
               <span className="flex items-center gap-2 text-[#302829] font-bold">
-                <span className="w-2.5 h-2.5 rounded-full bg-slate-300" /> Awaiting Response
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-300" /> Pending
               </span>
               <span className="font-extrabold text-[#302829]">{awaiting} <span className="text-[#8C7E80] font-normal">({awaitingPct}%)</span></span>
             </div>

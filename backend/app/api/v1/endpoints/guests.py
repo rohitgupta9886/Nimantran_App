@@ -4,7 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db, get_current_user
 from app.schemas.common import ResponseModel
-from app.schemas.guest import GuestCreate, GuestRead, GuestUpdate
+from app.schemas.guest import (
+    GuestCreate,
+    GuestRead,
+    GuestUpdate,
+    DuplicateCheckRequest,
+    DuplicateCheckResponse,
+    GuestMergeRequest,
+    ImportPreviewResponse,
+    ImportConfirmRequest,
+    ImportItemCandidate,
+)
 from app.services.guest_service import GuestService
 from app.services.event_service import EventService
 from app.services.ai_service import AIService
@@ -15,6 +25,48 @@ from app.models.user import User
 router = APIRouter()
 ai_service = AIService()
 whatsapp_provider = MockWhatsAppProvider()
+
+
+@router.post("/events/{event_id}/guests/check-duplicate", response_model=ResponseModel[DuplicateCheckResponse])
+async def check_duplicate(
+    event_id: str,
+    data: DuplicateCheckRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    event = await EventService.get_event_by_id(db, event_id)
+    if not event or event.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    res = await GuestService.check_duplicate_guest(
+        db=db,
+        event_id=event_id,
+        name=data.name,
+        phone=data.phone,
+        email=data.email,
+        exclude_guest_id=data.exclude_guest_id,
+    )
+    return ResponseModel(data=res, message="Duplicate check completed")
+
+
+@router.post("/events/{event_id}/guests/merge/{target_guest_id}", response_model=ResponseModel[GuestRead])
+async def merge_guest_record(
+    event_id: str,
+    target_guest_id: str,
+    data: GuestMergeRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    event = await EventService.get_event_by_id(db, event_id)
+    if not event or event.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    merged = await GuestService.merge_guest(db, target_guest_id, data)
+    if not merged or merged.event_id != event_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target guest not found in this event")
+
+    read_dto = await GuestService._to_guest_read(db, merged)
+    return ResponseModel(data=read_dto, message="Guest merged and updated successfully!")
 
 
 @router.post("/events/{event_id}/guests", response_model=ResponseModel[GuestRead])
@@ -28,8 +80,24 @@ async def create_guest(
     if not event or event.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
+    # If duplicate check not bypassed, check for potential match
+    if not data.allow_duplicate:
+        dup = await GuestService.check_duplicate_guest(
+            db=db,
+            event_id=event_id,
+            name=data.name,
+            phone=data.phone,
+            email=data.email,
+        )
+        if dup.has_duplicate:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=dup.warning_message or "Possible duplicate guest found",
+            )
+
     guest = await GuestService.create_guest(db, event_id, data, user_id=current_user.id)
-    return ResponseModel(data=GuestRead.model_validate(guest), message="Guest added successfully!")
+    read_dto = await GuestService._to_guest_read(db, guest)
+    return ResponseModel(data=read_dto, message="Guest added successfully!")
 
 
 @router.post("/events/{event_id}/guests/bulk", response_model=ResponseModel[dict])
@@ -45,12 +113,12 @@ async def bulk_create_guests(
 
     created = 0
     for g_data in guests_data:
-        await GuestService.create_guest(db, event_id, g_data)
+        await GuestService.create_guest(db, event_id, g_data, user_id=current_user.id)
         created += 1
 
     return ResponseModel(
         data={"imported_count": created},
-        message=f"Successfully imported {created} mobile contacts into your guest list!",
+        message=f"Successfully imported {created} contacts into your celebration guest list!",
     )
 
 
@@ -65,7 +133,8 @@ async def list_guests(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     guests = await GuestService.get_event_guests(db, event_id)
-    return ResponseModel(data=[GuestRead.model_validate(g) for g in guests])
+    read_dtos = [await GuestService._to_guest_read(db, g) for g in guests]
+    return ResponseModel(data=read_dtos)
 
 
 @router.put("/events/{event_id}/guests/{guest_id}", response_model=ResponseModel[GuestRead])
@@ -81,9 +150,11 @@ async def update_guest(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
     updated = await GuestService.update_guest(db, guest_id, data)
-    if not updated:
+    if not updated or updated.event_id != event_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guest not found")
-    return ResponseModel(data=GuestRead.model_validate(updated), message="Guest details updated successfully!")
+    
+    read_dto = await GuestService._to_guest_read(db, updated)
+    return ResponseModel(data=read_dto, message="Guest details updated successfully!")
 
 
 @router.delete("/events/{event_id}/guests/{guest_id}", response_model=ResponseModel[dict])
@@ -97,10 +168,65 @@ async def delete_guest(
     if not event or event.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
-    success = await GuestService.delete_guest(db, guest_id)
-    if not success:
+    target = await GuestService.get_guest_by_id(db, guest_id)
+    if not target or target.event_id != event_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Guest not found")
-    return ResponseModel(data={"deleted": True}, message="Guest removed from celebration list!")
+
+    success = await GuestService.delete_guest(db, guest_id)
+    return ResponseModel(data={"deleted": success}, message="Guest removed from celebration list!")
+
+
+@router.post("/events/{event_id}/guests/import-preview", response_model=ResponseModel[ImportPreviewResponse])
+async def preview_import_file(
+    event_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Stage 1: Validates and detects duplicates before creating any records.
+    """
+    event = await EventService.get_event_by_id(db, event_id)
+    if not event or event.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    file_bytes = await file.read()
+    parsed_candidates = await GuestService.parse_csv_or_excel(file_bytes, file.filename)
+    preview_res = await GuestService.preview_import_contacts(db, event_id, parsed_candidates)
+
+    return ResponseModel(
+        data=preview_res,
+        message=f"Analyzed {preview_res.total_parsed} contacts ({preview_res.valid_count} valid, {preview_res.duplicates_count} duplicates, {preview_res.invalid_count} invalid)",
+    )
+
+
+@router.post("/events/{event_id}/guests/import-confirm", response_model=ResponseModel[dict])
+async def confirm_import(
+    event_id: str,
+    payload: ImportConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Stage 2: Executes confirmed bulk import with user-selected duplicate policy (SKIP, MERGE, KEEP_SEPARATE).
+    """
+    event = await EventService.get_event_by_id(db, event_id)
+    if not event or event.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    res = await GuestService.confirm_import_contacts(
+        db=db,
+        event_id=event_id,
+        items=payload.items,
+        on_duplicate=payload.on_duplicate,
+        user_id=current_user.id,
+        save_to_master_list=payload.save_to_master_list,
+    )
+
+    return ResponseModel(
+        data=res,
+        message=f"Import complete: {res['created']} added, {res['merged']} merged, {res['skipped']} skipped.",
+    )
 
 
 @router.post("/events/{event_id}/guests/import", response_model=ResponseModel[dict])
@@ -116,24 +242,17 @@ async def import_guests_file(
 
     file_bytes = await file.read()
     parsed = await GuestService.parse_csv_or_excel(file_bytes, file.filename)
-    
-    created_count = 0
-    for item in parsed:
-        guest_data = GuestCreate(
-            name=item["name"],
-            phone=item.get("phone"),
-            email=item.get("email"),
-            group_name=item.get("group_name", "General"),
-            relationship=item.get("relationship", "Guest"),
-            adults_count=item.get("adults_count", 1),
-            children_count=item.get("children_count", 0),
-        )
-        await GuestService.create_guest(db, event_id, guest_data)
-        created_count += 1
+    res = await GuestService.confirm_import_contacts(
+        db=db,
+        event_id=event_id,
+        items=parsed,
+        on_duplicate="KEEP_SEPARATE",
+        user_id=current_user.id,
+    )
 
     return ResponseModel(
-        data={"total_imported": created_count},
-        message=f"Successfully imported {created_count} guests from {file.filename}!",
+        data={"total_imported": res["created"]},
+        message=f"Successfully imported {res['created']} guests from {file.filename}!",
     )
 
 

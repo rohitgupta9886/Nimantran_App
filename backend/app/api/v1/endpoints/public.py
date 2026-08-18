@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Optional, List, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db
 from app.schemas.common import ResponseModel
@@ -36,8 +37,43 @@ async def get_public_event(slug: str, db: AsyncSession = Depends(get_db)):
     event_data = EventRead.model_validate(event).model_dump()
     event_data.pop("user_id", None)  # Ensure private internal user_id is never leaked in public APIs
     theme_config = event.theme_config or {}
-    wishes = theme_config.get("wishes", [])
-    memories = theme_config.get("memories", [])
+
+    # Fetch approved wishes from database
+    from app.models.wish import CelebrationWish, ModerationStatus
+    from app.models.gallery import GalleryItem
+    from app.services.memory_service import MemoryService
+    
+    approved_wishes_objs = await MemoryService.get_approved_wishes_for_public(db, event.id)
+    wishes = [
+        {
+            "id": w.id,
+            "sender_name": w.sender_name,
+            "relationship": w.relationship,
+            "message": w.message,
+            "is_featured": w.is_featured,
+            "created_at": w.created_at.isoformat() if w.created_at else None,
+        }
+        for w in approved_wishes_objs
+    ]
+    # Fallback to legacy theme_config wishes if db is empty
+    if not wishes:
+        wishes = [w for w in theme_config.get("wishes", []) if w.get("status") in [None, "APPROVED"]]
+
+    # Fetch approved memories from database
+    approved_memories_objs = await MemoryService.get_approved_memories_for_public(db, event.id)
+    memories = [
+        {
+            "id": m.id,
+            "media_url": m.media_url,
+            "caption": m.caption,
+            "uploaded_by_name": m.uploaded_by_name or "Guest",
+            "is_featured": m.is_featured,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in approved_memories_objs
+    ]
+    if not memories:
+        memories = theme_config.get("memories", [])
 
     canonical = CanonicalInvitationContent.from_event(
         event=event,
@@ -62,6 +98,9 @@ async def submit_public_wish(
     payload: dict,
     db: AsyncSession = Depends(get_db),
 ):
+    from app.models.wish import CelebrationWish, ModerationStatus
+    from app.services.memory_service import MemoryService
+
     event = await EventService.get_event_by_id(db, slug)
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation link not found.")
@@ -72,19 +111,15 @@ async def submit_public_wish(
     if not message:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message content cannot be empty.")
 
-    theme_config = dict(event.theme_config or {})
-    wishes = list(theme_config.get("wishes", []))
-    
-    new_wish = {
-        "id": f"wish_{datetime.now(timezone.utc).timestamp()}",
-        "sender_name": sender_name,
-        "relationship": relationship,
-        "message": message,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    wishes.insert(0, new_wish)
-    theme_config["wishes"] = wishes
-    event.theme_config = theme_config
+    # Create wish in database defaulting to PENDING moderation
+    wish = await MemoryService.create_wish(
+        db=db,
+        event_id=event.id,
+        sender_name=sender_name,
+        relationship=relationship,
+        message=message,
+        status=ModerationStatus.PENDING,
+    )
 
     # Also check if this matches an existing guest by name to update their welcome quote for TV screen
     from sqlalchemy import select
@@ -94,12 +129,18 @@ async def submit_public_wish(
     guest = res.scalars().first()
     if guest:
         guest.custom_welcome_quote = f"💬 '{message}' — {sender_name}"
-
-    await db.commit()
+        await db.commit()
 
     return ResponseModel(
-        data=new_wish,
-        message="Thank you! Your warm wishes and blessings have been added to the celebration wall."
+        data={
+            "id": wish.id,
+            "sender_name": wish.sender_name,
+            "relationship": wish.relationship,
+            "message": wish.message,
+            "status": wish.status.value,
+            "created_at": wish.created_at.isoformat(),
+        },
+        message="Thank you! Your warm wishes have been submitted and will appear on the celebration wall upon host approval."
     )
 
 
@@ -152,7 +193,22 @@ async def submit_public_rsvp(
     else:
         rsvp_enum = RSVPStatus.NO
 
-    adults_count = int(payload.get("adults_attending", 1))
+    adults_raw = payload.get("adults_attending")
+    children_raw = payload.get("children_attending", 0)
+
+    if rsvp_enum == RSVPStatus.YES:
+        adults_count = max(1, min(int(adults_raw if adults_raw is not None else 1), 20))
+        children_count = max(0, min(int(children_raw if children_raw is not None else 0), 20))
+        status_label = "Attendance Confirmed"
+    elif rsvp_enum == RSVPStatus.MAYBE:
+        adults_count = max(1, min(int(adults_raw if adults_raw is not None else 1), 20))
+        children_count = max(0, min(int(children_raw if children_raw is not None else 0), 20))
+        status_label = "Tentative (Maybe)"
+    else:
+        adults_count = 0
+        children_count = 0
+        status_label = "Declined with Regrets"
+
     meal_pref = payload.get("meal_preference", "Veg (only)")
     notes = payload.get("notes", "").strip()
 
@@ -174,14 +230,18 @@ async def submit_public_rsvp(
             name=guest_name,
             phone=phone,
             relationship="Guest",
-            adults_count=adults_count,
+            adults_count=adults_count if rsvp_enum == RSVPStatus.YES else 1,
+            children_count=children_count,
             rsvp_status=rsvp_enum,
+            notes=f"Meal: {meal_pref} | Note: {notes}" if notes else f"Meal: {meal_pref}",
         )
         db.add(guest)
         await db.flush()
     else:
         guest.rsvp_status = rsvp_enum
-        guest.adults_count = adults_count
+        guest.adults_count = adults_count if rsvp_enum == RSVPStatus.YES else (guest.adults_count or 1)
+        guest.children_count = children_count
+        guest.notes = f"Meal: {meal_pref} | Note: {notes}" if notes else f"Meal: {meal_pref}"
         if phone and not guest.phone:
             guest.phone = phone
 
@@ -196,7 +256,7 @@ async def submit_public_rsvp(
             event_id=event.id,
             status=rsvp_enum,
             adults_attending=adults_count,
-            children_attending=0,
+            children_attending=children_count,
             dietary_preference=meal_pref,
             wishes_note=notes,
         )
@@ -204,19 +264,36 @@ async def submit_public_rsvp(
     else:
         rsvp_rec.status = rsvp_enum
         rsvp_rec.adults_attending = adults_count
+        rsvp_rec.children_attending = children_count
         rsvp_rec.dietary_preference = meal_pref
         rsvp_rec.wishes_note = notes
 
-    # 3. Log into recent RSVP feed in event theme config for live admin dashboard
+    # 3. Query GuestEntryPass for real passcode
+    from app.models.qr_pass import GuestEntryPass
+    pass_stmt = select(GuestEntryPass.pass_code).where(GuestEntryPass.guest_id == guest.id)
+    pass_res = await db.execute(pass_stmt)
+    pass_code = pass_res.scalar_one_or_none() or "NIM-ENTRY"
+
+    # 4. Log into recent RSVP feed in event theme config for live admin dashboard
     theme_config = dict(event.theme_config or {})
-    feed = list(theme_config.get("recent_rsvps", []))
+    feed = [item for item in list(theme_config.get("recent_rsvps", [])) if item.get("guest_name") != guest.name]
     feed_entry = {
         "id": f"rsvp_{datetime.now(timezone.utc).timestamp()}",
-        "guest_name": guest_name,
+        "guest_id": guest.id,
+        "guest_name": guest.name,
         "status": rsvp_enum.value,
+        "status_label": status_label,
         "adults_attending": adults_count,
+        "children_attending": children_count,
+        "total_attending": adults_count + children_count if rsvp_enum == RSVPStatus.YES else 0,
         "meal_preference": meal_pref,
+        "notes": notes,
+        "pass_code": pass_code,
+        "event_title": event.title,
+        "event_date": event.start_date.isoformat() if event.start_date else None,
+        "venue_name": event.venue_name,
         "timestamp": "Just now",
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     feed.insert(0, feed_entry)
@@ -227,7 +304,7 @@ async def submit_public_rsvp(
 
     return ResponseModel(
         data=feed_entry,
-        message=f"Thank you {guest_name}! Your RSVP has been successfully recorded."
+        message=f"Thank you {guest.name}! Your RSVP has been successfully recorded."
     )
 
 
@@ -272,15 +349,56 @@ async def get_public_invitation_by_token(
     theme_config = event.theme_config or {}
 
     # Format personalized greeting
-    salutation = f"Dear {guest.name}"
-    if guest.category and guest.category.value == "FAMILY":
-        salutation = f"Dear {guest.name} & Family"
+    is_family = (guest.category and guest.category.value == "FAMILY") or "family" in (guest.relationship or "").lower()
+    salutation = f"Dear {guest.name} & Family ❤️" if is_family else f"Dear {guest.name} ❤️"
+
+    # Query GuestEntryPass for real passcode
+    from app.models.qr_pass import GuestEntryPass
+    pass_stmt = select(GuestEntryPass.pass_code).where(GuestEntryPass.guest_id == guest.id)
+    pass_res = await db.execute(pass_stmt)
+    pass_code = pass_res.scalar_one_or_none() or "NIM-ENTRY"
 
     canonical = CanonicalInvitationContent.from_event(
         event=event,
         ai_content=theme_config.get("canonical_invitation"),
         guest_token=token,
     )
+
+    # Fetch approved wishes from database
+    from app.models.wish import CelebrationWish, ModerationStatus
+    from app.models.gallery import GalleryItem
+    from app.services.memory_service import MemoryService
+    
+    approved_wishes_objs = await MemoryService.get_approved_wishes_for_public(db, event.id)
+    wishes = [
+        {
+            "id": w.id,
+            "sender_name": w.sender_name,
+            "relationship": w.relationship,
+            "message": w.message,
+            "is_featured": w.is_featured,
+            "created_at": w.created_at.isoformat() if w.created_at else None,
+        }
+        for w in approved_wishes_objs
+    ]
+    if not wishes:
+        wishes = [w for w in theme_config.get("wishes", []) if w.get("status") in [None, "APPROVED"]]
+
+    # Fetch approved memories from database
+    approved_memories_objs = await MemoryService.get_approved_memories_for_public(db, event.id)
+    memories = [
+        {
+            "id": m.id,
+            "media_url": m.media_url,
+            "caption": m.caption,
+            "uploaded_by_name": m.uploaded_by_name or "Guest",
+            "is_featured": m.is_featured,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in approved_memories_objs
+    ]
+    if not memories:
+        memories = theme_config.get("memories", [])
 
     return ResponseModel(
         data={
@@ -290,11 +408,12 @@ async def get_public_invitation_by_token(
             "salutation": salutation,
             "rsvp_status": guest.rsvp_status.value if hasattr(guest.rsvp_status, 'value') else str(guest.rsvp_status),
             "adults_count": guest.adults_count,
+            "pass_code": pass_code,
             "notes": guest.notes,
             "event": event_data,
             "canonical_invitation": canonical.model_dump(),
-            "wishes": theme_config.get("wishes", []),
-            "memories": theme_config.get("memories", []),
+            "wishes": wishes,
+            "memories": memories,
             "music_url": theme_config.get("music_url", "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3"),
             "theme_id": theme_config.get("theme_id", "romantic-blush"),
         },
@@ -318,27 +437,47 @@ async def submit_public_rsvp_by_token(
     if not guest:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invalid invitation token."
+            detail="This invitation link is invalid or no longer available."
         )
 
     event = await EventService.get_event_by_id(db, guest.event_id)
     if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The celebration event could not be found."
+        )
 
-    status_raw = payload.get("status", "CONFIRMED").upper()
+    status_raw = payload.get("status", "YES").upper()
     if status_raw in ["YES", "CONFIRMED", "ATTENDING"]:
-        rsvp_enum = RSVPStatus.CONFIRMED
+        rsvp_enum = RSVPStatus.YES
     elif status_raw in ["MAYBE", "UNCERTAIN"]:
         rsvp_enum = RSVPStatus.MAYBE
     else:
-        rsvp_enum = RSVPStatus.NOT_ATTENDING
+        rsvp_enum = RSVPStatus.NO
 
-    adults_count = int(payload.get("adults_attending", guest.adults_count or 1))
+    adults_raw = payload.get("adults_attending")
+    children_raw = payload.get("children_attending", 0)
+
+    if rsvp_enum == RSVPStatus.YES:
+        adults_count = max(1, min(int(adults_raw if adults_raw is not None else (guest.adults_count or 1)), 20))
+        children_count = max(0, min(int(children_raw if children_raw is not None else (guest.children_count or 0)), 20))
+        status_label = "Attendance Confirmed"
+    elif rsvp_enum == RSVPStatus.MAYBE:
+        adults_count = max(1, min(int(adults_raw if adults_raw is not None else (guest.adults_count or 1)), 20))
+        children_count = max(0, min(int(children_raw if children_raw is not None else (guest.children_count or 0)), 20))
+        status_label = "Tentative (Maybe)"
+    else:
+        adults_count = 0
+        children_count = 0
+        status_label = "Declined with Regrets"
+
     meal_pref = payload.get("meal_preference", "Veg (only)")
     notes = payload.get("notes", "").strip()
 
     guest.rsvp_status = rsvp_enum
-    guest.adults_count = adults_count
+    if rsvp_enum == RSVPStatus.YES:
+        guest.adults_count = adults_count
+    guest.children_count = children_count
     guest.notes = f"Meal: {meal_pref} | Note: {notes}" if notes else f"Meal: {meal_pref}"
 
     # Upsert RSVP
@@ -352,7 +491,7 @@ async def submit_public_rsvp_by_token(
             event_id=event.id,
             status=rsvp_enum,
             adults_attending=adults_count,
-            children_attending=0,
+            children_attending=children_count,
             dietary_preference=meal_pref,
             wishes_note=notes,
         )
@@ -360,19 +499,36 @@ async def submit_public_rsvp_by_token(
     else:
         rsvp_rec.status = rsvp_enum
         rsvp_rec.adults_attending = adults_count
+        rsvp_rec.children_attending = children_count
         rsvp_rec.dietary_preference = meal_pref
         rsvp_rec.wishes_note = notes
 
-    # Log into recent feed
+    # Query real passcode
+    from app.models.qr_pass import GuestEntryPass
+    pass_stmt = select(GuestEntryPass.pass_code).where(GuestEntryPass.guest_id == guest.id)
+    pass_res = await db.execute(pass_stmt)
+    pass_code = pass_res.scalar_one_or_none() or "NIM-ENTRY"
+
+    # Log into recent feed (replace old entry for same guest if exists)
     theme_config = dict(event.theme_config or {})
-    feed = list(theme_config.get("recent_rsvps", []))
+    feed = [item for item in list(theme_config.get("recent_rsvps", [])) if item.get("guest_name") != guest.name]
     feed_entry = {
         "id": f"rsvp_{datetime.now(timezone.utc).timestamp()}",
+        "guest_id": guest.id,
         "guest_name": guest.name,
         "status": rsvp_enum.value,
+        "status_label": status_label,
         "adults_attending": adults_count,
+        "children_attending": children_count,
+        "total_attending": adults_count + children_count if rsvp_enum == RSVPStatus.YES else 0,
         "meal_preference": meal_pref,
+        "notes": notes,
+        "pass_code": pass_code,
+        "event_title": event.title,
+        "event_date": event.start_date.isoformat() if event.start_date else None,
+        "venue_name": event.venue_name,
         "timestamp": "Just now",
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     feed.insert(0, feed_entry)
@@ -384,6 +540,209 @@ async def submit_public_rsvp_by_token(
     return ResponseModel(
         data=feed_entry,
         message=f"Thank you {guest.name}! Your RSVP has been confirmed."
+    )
+
+
+@router.post("/invitations/t/{token}/wishes", response_model=ResponseModel[dict])
+async def submit_public_wish_by_token(
+    token: str,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import select
+    from app.models.guest import Guest
+    from app.models.wish import CelebrationWish, ModerationStatus
+    from app.services.memory_service import MemoryService
+
+    stmt = select(Guest).where(Guest.invitation_token == token)
+    res = await db.execute(stmt)
+    guest = res.scalars().first()
+
+    if not guest:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation link not found.")
+
+    event = await EventService.get_event_by_id(db, guest.event_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found.")
+
+    sender_name = payload.get("sender_name", "").strip() or guest.name
+    relationship = payload.get("relationship", "").strip() or guest.relationship or "Guest"
+    message = payload.get("message", "").strip()
+    if not message:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message content cannot be empty.")
+
+    # Create wish in database with PENDING moderation status
+    wish = await MemoryService.create_wish(
+        db=db,
+        event_id=event.id,
+        sender_name=sender_name,
+        relationship=relationship,
+        message=message,
+        guest_id=guest.id,
+        status=ModerationStatus.PENDING,
+    )
+
+    guest.custom_welcome_quote = f"💬 '{message}' — {sender_name}"
+    await db.commit()
+
+    return ResponseModel(
+        data={
+            "id": wish.id,
+            "sender_name": wish.sender_name,
+            "relationship": wish.relationship,
+            "message": wish.message,
+            "status": wish.status.value,
+            "created_at": wish.created_at.isoformat(),
+        },
+        message="Thank you! Your warm wishes have been submitted and will appear on the celebration wall upon host approval."
+    )
+
+
+@router.post("/events/{slug}/memories", response_model=ResponseModel[dict])
+async def submit_public_memory_photo(
+    slug: str,
+    file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
+    sender_name: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Guest endpoint: Upload a celebration photo memory to the event (defaults to PENDING host review)."""
+    from app.models.wish import ModerationStatus
+    from app.services.memory_service import MemoryService
+
+    event = await EventService.get_event_by_id(db, slug)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found.")
+
+    file_bytes = await file.read()
+    media_url, file_size, mime_type = await MemoryService.upload_memory_photo(
+        file_bytes=file_bytes,
+        filename=file.filename or "photo.jpg",
+        content_type=file.content_type or "image/jpeg",
+    )
+
+    item = await MemoryService.create_memory_item(
+        db=db,
+        event_id=event.id,
+        media_url=media_url,
+        caption=caption,
+        uploaded_by_name=sender_name or "Guest",
+        status=ModerationStatus.PENDING,
+        file_size_bytes=file_size,
+        mime_type=mime_type,
+    )
+
+    return ResponseModel(
+        data={
+            "id": item.id,
+            "media_url": item.media_url,
+            "caption": item.caption,
+            "status": item.status.value,
+            "created_at": item.created_at.isoformat(),
+        },
+        message="Photo memory uploaded successfully! It will appear on the celebration wall once approved by the host."
+    )
+
+
+@router.post("/invitations/t/{token}/memories", response_model=ResponseModel[dict])
+async def submit_public_memory_photo_by_token(
+    token: str,
+    file: UploadFile = File(...),
+    caption: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Personalized guest endpoint: Upload a photo memory linked to an invitation token."""
+    from sqlalchemy import select
+    from app.models.guest import Guest
+    from app.models.wish import ModerationStatus
+    from app.services.memory_service import MemoryService
+
+    stmt = select(Guest).where(Guest.invitation_token == token)
+    res = await db.execute(stmt)
+    guest = res.scalars().first()
+
+    if not guest:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invitation link not found.")
+
+    event = await EventService.get_event_by_id(db, guest.event_id)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found.")
+
+    file_bytes = await file.read()
+    media_url, file_size, mime_type = await MemoryService.upload_memory_photo(
+        file_bytes=file_bytes,
+        filename=file.filename or "photo.jpg",
+        content_type=file.content_type or "image/jpeg",
+    )
+
+    item = await MemoryService.create_memory_item(
+        db=db,
+        event_id=event.id,
+        media_url=media_url,
+        caption=caption,
+        uploaded_by_guest_id=guest.id,
+        uploaded_by_name=guest.name,
+        status=ModerationStatus.PENDING,
+        file_size_bytes=file_size,
+        mime_type=mime_type,
+    )
+
+    return ResponseModel(
+        data={
+            "id": item.id,
+            "media_url": item.media_url,
+            "caption": item.caption,
+            "uploaded_by_name": guest.name,
+            "status": item.status.value,
+            "created_at": item.created_at.isoformat(),
+        },
+        message=f"Thank you {guest.name}! Your photo memory has been submitted for host review."
+    )
+
+
+@router.get("/events/{slug}/memories", response_model=ResponseModel[dict])
+async def get_public_event_memories_wall(
+    slug: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Public endpoint: Returns all approved photo memories and approved wishes for the event wall."""
+    from app.services.memory_service import MemoryService
+
+    event = await EventService.get_event_by_id(db, slug)
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found.")
+
+    approved_wishes_objs = await MemoryService.get_approved_wishes_for_public(db, event.id)
+    approved_memories_objs = await MemoryService.get_approved_memories_for_public(db, event.id)
+
+    return ResponseModel(
+        data={
+            "event_title": event.title,
+            "host_name": event.host_name,
+            "wishes": [
+                {
+                    "id": w.id,
+                    "sender_name": w.sender_name,
+                    "relationship": w.relationship,
+                    "message": w.message,
+                    "is_featured": w.is_featured,
+                    "created_at": w.created_at.isoformat() if w.created_at else None,
+                }
+                for w in approved_wishes_objs
+            ],
+            "memories": [
+                {
+                    "id": m.id,
+                    "media_url": m.media_url,
+                    "caption": m.caption,
+                    "uploaded_by_name": m.uploaded_by_name or "Guest",
+                    "is_featured": m.is_featured,
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                }
+                for m in approved_memories_objs
+            ],
+        },
+        message="Approved public memories and wishes retrieved successfully."
     )
 
 

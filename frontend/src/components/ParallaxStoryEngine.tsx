@@ -133,8 +133,19 @@ const AlternatingStoryCard: React.FC<{
       {/* 🌟 3D ARTISTIC NON-RECTANGULAR CARD — TEXT DIRECTLY INTEGRATED ON IMAGE (NO TIME DISPLAYED) 🌟 */}
       <div
         onClick={() => onSelectMemory && onSelectMemory(memory)}
-        className={`relative w-full max-w-[340px] sm:max-w-[420px] h-[460px] sm:h-[520px] ${cardShape} overflow-hidden shadow-2xl group cursor-pointer border-4 border-amber-300/85 transition-all duration-300 transform-gpu hover:scale-[1.02] hover:border-amber-300`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onSelectMemory && onSelectMemory(memory);
+          }
+        }}
+        tabIndex={0}
+        role="button"
+        aria-label={`View story memory: ${englishTitle}`}
+        className={`relative w-full max-w-[320px] xs:max-w-[340px] sm:max-w-[420px] h-[440px] xs:h-[460px] sm:h-[520px] ${cardShape} overflow-hidden shadow-2xl group cursor-pointer border-4 border-amber-300/85 transition-all duration-300 transform-gpu hover:scale-[1.02] hover:border-amber-300 focus-visible:ring-4 focus-visible:ring-amber-400 focus-visible:outline-none`}
         style={{
+          willChange: 'transform, opacity',
+          contain: 'layout paint',
           boxShadow: isVisible 
             ? '0 30px 90px -10px rgba(0, 0, 0, 0.95), 0 0 45px rgba(255, 215, 0, 0.45)' 
             : '0 20px 50px -10px rgba(0, 0, 0, 0.8)',
@@ -144,6 +155,8 @@ const AlternatingStoryCard: React.FC<{
         <img
           src={bgImage}
           alt={englishTitle}
+          loading="lazy"
+          decoding="async"
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 transform-gpu group-hover:scale-105 filter brightness-[0.7] contrast-[1.15]"
         />
 

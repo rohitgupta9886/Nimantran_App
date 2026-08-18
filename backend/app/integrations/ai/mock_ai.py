@@ -179,4 +179,95 @@ class MockAIProvider(AIProvider):
             f"We look forward to welcoming you with warmest regards!"
         )
 
+    async def generate_celebration_story(
+        self,
+        event_facts: Dict[str, Any],
+        approved_wishes: List[Dict[str, Any]],
+        approved_memories: List[Dict[str, Any]],
+        attendance_summary: Dict[str, Any],
+        style: str = "EMOTIONAL_ROYAL",
+    ) -> Dict[str, Any]:
+        title = event_facts.get("title", "Celebration")
+        host_name = event_facts.get("host_name", "Our Family")
+        venue_name = event_facts.get("venue_name", "The Celebration Venue")
+        date_str = event_facts.get("date_str", "This Special Day")
+        event_type = event_facts.get("event_type", "CELEBRATION")
+        checked_in = attendance_summary.get("checked_in_count", 0)
+        total_guests = attendance_summary.get("total_guests", 0)
+
+        wishes_count = len(approved_wishes)
+        memories_count = len(approved_memories)
+
+        top_wishes_text = [
+            f"\"{w.get('message')}\" — {w.get('sender_name')}"
+            for w in approved_wishes[:3]
+        ]
+        highlights = [
+            f"Over {checked_in} honored guests gathered at {venue_name} to celebrate with {host_name}.",
+            f"Received {wishes_count} heartfelt blessings and congratulations from family and close friends.",
+            f"Preserved {memories_count} captured photographic memories from the milestone functions.",
+        ]
+        if top_wishes_text:
+            highlights.append(f"Cherished blessings: {'; '.join(top_wishes_text)}")
+
+        story_hi = (
+            f"|| श्री गणेशाय नमः ||\n\n"
+            f"'{title}' का यह अलौकिक उत्सव {host_name} परिवार के लिए जीवन का एक अविस्मरणीय स्वर्णिम अध्याय बन गया। "
+            f"{venue_name} के पावन प्रांगण में उपस्थित {checked_in} आत्मीय जनों की गरिमामयी उपस्थिति ने इस दिन को अनंत खुशियों और देवतुल्य आशीर्वाद से भर दिया।"
+        )
+
+        story_en = (
+            f"The grand celebration of '{title}' hosted with immense grace by {host_name} at {venue_name} "
+            f"concluded on a note of supreme joy and gratitude. Surrounded by {checked_in} cherished guests and enveloped in {wishes_count} warm blessings, "
+            f"every single moment captured an enduring testament to love, heritage, and togetherness."
+        )
+
+        gratitude_note = (
+            f"With profound gratitude, the {host_name} family extends heartfelt thanks to all {checked_in} guests who graced '{title}' "
+            f"and showered us with their eternal love and blessings."
+        )
+
+        return {
+            "title": f"Celebration Chronicles: {title}",
+            "event_type": event_type,
+            "host_name": host_name,
+            "venue_name": venue_name,
+            "date_str": date_str,
+            "attendance_grounding": attendance_summary,
+            "story_hindi": story_hi,
+            "story_english": story_en,
+            "highlights": highlights,
+            "host_gratitude_note": gratitude_note,
+            "approved_wishes_count": wishes_count,
+            "approved_memories_count": memories_count,
+        }
+
+    async def generate_memory_caption(
+        self, event_type: str, milestone_or_tag: str = "Celebration Moment", guest_name: Optional[str] = None
+    ) -> Dict[str, str]:
+        who = f"with {guest_name}" if guest_name else "with loved ones"
+        hi_caption = f"खुशियों और आत्मीयता से सराबोर एक अनमोल पल — '{milestone_or_tag}' की मधुर स्मृति {who}।"
+        en_caption = f"A timeless moment of pure joy and celebration during '{milestone_or_tag}' {who}."
+        return {
+            "caption_hindi": hi_caption,
+            "caption_english": en_caption,
+            "combined_caption": f"{hi_caption}\n{en_caption}",
+        }
+
+    async def generate_attendance_thank_you(
+        self, event_facts: Dict[str, Any], attendance_summary: Dict[str, Any]
+    ) -> Dict[str, str]:
+        title = event_facts.get("title", "our celebration")
+        host = event_facts.get("host_name", "Our Family")
+
+        hi = f"सप्रेम धन्यवाद! '{title}' के पावन अवसर पर आपकी गरिमामयी उपस्थिति ने हमारे उत्साह को द्विगुणित कर दिया। {host} परिवार आपकी शुभकामनाओं के लिए सदैव आभारी रहेगा।"
+        en = f"Heartfelt Thank You! Your gracious presence at '{title}' made our special day truly memorable. The {host} family warmly thanks you for your love and blessings."
+        whatsapp = f"🙏 *Heartfelt Gratitude from {host}*\n\nThank you for gracing *{title}* with your presence and blessings! Your warmth made the celebration truly unforgettable. ❤️✨"
+
+        return {
+            "thank_you_hindi": hi,
+            "thank_you_english": en,
+            "whatsapp_ready_message": whatsapp,
+        }
+
 

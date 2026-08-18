@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Sparkles, User, Mail, Phone, Lock } from 'lucide-react';
 import { apiFetch } from '../services/api';
 import { useAuth } from '../store/authStore';
+import { Button, Input } from '../components/ui';
 
 export const RegisterPage: React.FC = () => {
   const [fullName, setFullName] = useState('');
@@ -55,82 +57,90 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md glass-panel p-8 rounded-3xl gold-border shadow-2xl space-y-6">
+    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-canvas">
+      <div className="w-full max-w-md bg-white border border-charcoal-200/80 p-8 rounded-3xl shadow-lg space-y-6">
+        
+        {/* Header */}
         <div className="text-center space-y-2">
-          <h2 className="font-serif text-3xl font-bold gold-gradient-text">Create Host Account</h2>
-          <p className="text-slate-400 text-xs">Get 100 Free AI Credits on signup</p>
+          <Link to="/" className="inline-block">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-wine via-wine-700 to-gold p-0.5 shadow-sm mx-auto flex items-center justify-center">
+              <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
+                <span className="font-serif font-extrabold text-2xl text-wine">N</span>
+              </div>
+            </div>
+          </Link>
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-charcoal-900 tracking-tight">
+            Create Host Account
+          </h2>
+          <p className="text-charcoal-500 text-xs sm:text-sm">
+            Get started with 100 Free AI Credits for your celebrations
+          </p>
         </div>
 
         {error && (
-          <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs text-center">
+          <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium text-center">
             {error}
           </div>
         )}
 
         <form onSubmit={handleRegister} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-amber-200/80 mb-1">Full Name / Host Name</label>
-            <input
-              type="text"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Rohit & Neha Gupta"
-              className="w-full px-4 py-3 rounded-xl bg-[#0D0205] border border-amber-500/30 text-white placeholder-slate-600 focus:outline-none focus:border-amber-400 text-sm"
-            />
-          </div>
+          <Input
+            label="Full Name / Host Name"
+            type="text"
+            required
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Rohit & Neha Gupta"
+            leftIcon={<User className="w-4 h-4" />}
+          />
 
-          <div>
-            <label className="block text-xs font-semibold text-amber-200/80 mb-1">Email Address</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="host@example.com"
-              className="w-full px-4 py-3 rounded-xl bg-[#0D0205] border border-amber-500/30 text-white placeholder-slate-600 focus:outline-none focus:border-amber-400 text-sm"
-            />
-          </div>
+          <Input
+            label="Email Address"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="host@example.com"
+            leftIcon={<Mail className="w-4 h-4" />}
+          />
 
-          <div>
-            <label className="block text-xs font-semibold text-amber-200/80 mb-1">WhatsApp / Phone Number</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+91 98765 43210"
-              className="w-full px-4 py-3 rounded-xl bg-[#0D0205] border border-amber-500/30 text-white placeholder-slate-600 focus:outline-none focus:border-amber-400 text-sm"
-            />
-          </div>
+          <Input
+            label="WhatsApp / Phone Number"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+91 98765 43210"
+            leftIcon={<Phone className="w-4 h-4" />}
+          />
 
-          <div>
-            <label className="block text-xs font-semibold text-amber-200/80 mb-1">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-4 py-3 rounded-xl bg-[#0D0205] border border-amber-500/30 text-white placeholder-slate-600 focus:outline-none focus:border-amber-400 text-sm"
-            />
-          </div>
+          <Input
+            label="Password"
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            leftIcon={<Lock className="w-4 h-4" />}
+            helperText="Minimum 6 characters"
+          />
 
-          <button
+          <Button
             type="submit"
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-black font-bold text-sm shadow-lg shadow-amber-500/20 hover:scale-[1.02] transition-transform disabled:opacity-50"
+            isLoading={loading}
+            fullWidth
+            size="lg"
+            variant="primary"
           >
-            {loading ? 'Creating Account...' : 'Create Host Account'}
-          </button>
+            Create Free Account
+          </Button>
         </form>
 
-        <p className="text-center text-xs text-slate-400">
+        <div className="text-center text-xs text-charcoal-500 pt-1">
           Already have an account?{' '}
-          <Link to="/login" className="text-amber-400 hover:underline font-semibold">
-            Sign In
+          <Link to="/login" className="text-wine font-bold hover:underline">
+            Sign in
           </Link>
-        </p>
+        </div>
       </div>
     </div>
   );

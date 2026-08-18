@@ -106,7 +106,12 @@ class QRService:
             await db.commit()
 
         welcome_quote = guest.custom_welcome_quote or f"Welcome {guest.name}! We are delighted to have you at {event.title}."
-        msg = "Guest Checked In Successfully!" if not already_checked else "WARNING: Guest Already Checked In!"
+        
+        if already_checked:
+            checkin_time_str = (guest.checked_in_at or now).strftime("%I:%M %p").lstrip("0")
+            msg = f"Already checked in at {checkin_time_str}."
+        else:
+            msg = f"✓ Welcome {guest.name}! Entry confirmed."
 
         return CheckinResponse(
             success=True,
@@ -119,7 +124,7 @@ class QRService:
             adults_count=guest.adults_count,
             children_count=guest.children_count,
             already_checked_in=already_checked,
-            checked_in_at=now if not already_checked else (guest.checked_in_at or now),
+            checked_in_at=guest.checked_in_at or now,
             check_in_method=check_in_method or "QR_SCAN",
             welcome_quote=welcome_quote,
         )
