@@ -1,44 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Heart, RotateCcw, Volume2, VolumeX, ChevronDown, Check } from 'lucide-react';
+import { Sparkles, Heart, RotateCcw } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { CelebrationTheme } from '../../utils/themeCatalog';
-import { getCelebrationConfig } from '../../utils/celebrationEngine';
+import { ExperienceTheme } from '../engine/ExperienceThemeEngine';
+import { playUnboxingSound } from '../engine/AudioEngine';
 
-interface EnvelopeExperienceProps {
+interface OpeningSceneProps {
   title: string;
   hindiTitle?: string;
   salutation?: string;
   guestName?: string;
-  eventType?: string;
-  theme: CelebrationTheme;
-  musicUrl?: string;
+  theme: ExperienceTheme;
   onOpenComplete: () => void;
-  onToggleMusic?: () => void;
-  isPlayingMusic?: boolean;
 }
 
-export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
+export const OpeningScene: React.FC<OpeningSceneProps> = ({
   title,
   hindiTitle,
   salutation,
   guestName,
-  eventType = 'WEDDING',
   theme,
-  musicUrl,
   onOpenComplete,
-  onToggleMusic,
-  isPlayingMusic,
 }) => {
   // CONTINUOUS CINEMATIC MOTION PHASES:
   // 'DOVE_FLIGHT' (0.0s - 2.0s): Heavenly Dove soaring forward through sunlit clouds
-  // 'ENVELOPE_DESCENT' (2.0s - 4.2s): Royal patterned envelope continuously tumbling down through clouds
+  // 'ENVELOPE_DESCENT' (2.0s - 4.2s): Royal envelope continuously tumbling down through clouds
   // 'DOCKED_READY' (4.2s+): Envelope centered in foreground, glowing wax seal, awaiting tap
   // 'CARD_EMERGING' (On Tap): Flap opens, glowing stationery card rises vertically upwards
   const [motionPhase, setMotionPhase] = useState<'DOVE_FLIGHT' | 'ENVELOPE_DESCENT' | 'DOCKED_READY' | 'CARD_EMERGING'>('DOVE_FLIGHT');
   
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const envelopeRef = useRef<HTMLDivElement | null>(null);
-  const cfg = getCelebrationConfig(eventType, '', title);
 
   // Auto-advance continuous flight timeline
   useEffect(() => {
@@ -56,26 +47,6 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
     };
   }, []);
 
-  // Determine Auspicious Seal Emblem
-  const getSealEmblem = () => {
-    switch (eventType.toUpperCase()) {
-      case 'WEDDING':
-      case 'ENGAGEMENT':
-      case 'MUNDAN':
-        return 'ॐ';
-      case 'BIRTHDAY':
-        return '🎂';
-      case 'ANNIVERSARY':
-        return '❤️';
-      case 'FESTIVAL':
-        return '🪔';
-      case 'CORPORATE':
-        return '✦';
-      default:
-        return '✨';
-    }
-  };
-
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (motionPhase !== 'DOCKED_READY' || !envelopeRef.current) return;
     const rect = envelopeRef.current.getBoundingClientRect();
@@ -89,42 +60,6 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
 
   const handleMouseLeave = () => {
     setTilt({ x: 0, y: 0 });
-  };
-
-  // Synthesize Sub-Bass Impact Boom & Pentatonic Royal Chimes
-  const playOpeningAudio = () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-
-      // 1. Sub-Bass Impact Boom (120Hz -> 20Hz)
-      const boom = ctx.createOscillator();
-      const boomGain = ctx.createGain();
-      boom.type = 'triangle';
-      boom.frequency.setValueAtTime(120, ctx.currentTime);
-      boom.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 1.8);
-      boomGain.gain.setValueAtTime(0.85, ctx.currentTime);
-      boomGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.8);
-      boom.connect(boomGain);
-      boomGain.connect(ctx.destination);
-      boom.start();
-      boom.stop(ctx.currentTime + 1.8);
-
-      // 2. Pentatonic Royal Chime Sweep
-      [523.25, 659.25, 783.99, 1046.5, 1318.51].forEach((freq, i) => {
-        const chime = ctx.createOscillator();
-        const chimeGain = ctx.createGain();
-        chime.type = 'sine';
-        chime.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
-        chimeGain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.08);
-        chimeGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 1.2);
-        chime.connect(chimeGain);
-        chimeGain.connect(ctx.destination);
-        chime.start(ctx.currentTime + i * 0.08);
-        chime.stop(ctx.currentTime + i * 0.08 + 1.2);
-      });
-    } catch (e) {}
   };
 
   const triggerConfetti = () => {
@@ -142,7 +77,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
   const handleOpenEnvelope = () => {
     if (motionPhase === 'CARD_EMERGING') return;
     setMotionPhase('CARD_EMERGING');
-    playOpeningAudio();
+    playUnboxingSound();
 
     // 0.8s: Confetti burst on card elevation
     setTimeout(() => {
@@ -164,14 +99,12 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
       
       {/* 🌟 1. IMMERSIVE FULL-PAGE CONTINUOUS SKY & CLOUD BACKGROUND 🌟 */}
       <div className="absolute inset-0 -z-20 overflow-hidden">
-        {/* Sky Base Texture */}
         <img
           src="/dove_scene3.jpg"
           alt="Sunlit Sky & Clouds"
           className="w-full h-full object-cover scale-105 filter brightness-105 contrast-105"
         />
 
-        {/* Ambient Sunburst Rays & Gold Atmosphere */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -180,7 +113,6 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
           }}
         />
 
-        {/* Shimmering Golden Stardust & Floating Dust */}
         <div
           className="absolute inset-0 opacity-40 pointer-events-none"
           style={{
@@ -201,7 +133,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
               ? '✨ Delivering Your Auspicious Invitation...'
               : guestName
               ? `Exclusive Invitation for ${guestName}`
-              : cfg.giftBoxTag}
+              : '✦ An Auspicious Celebration Awaits You ✦'}
           </span>
           <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
         </div>
@@ -270,11 +202,10 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
           <div
             className="absolute inset-0 rounded-3xl border-2 border-amber-300/90 shadow-2xl overflow-hidden"
             style={{
-              background: 'linear-gradient(135deg, #4A1020 0%, #2A0612 100%)',
-              boxShadow: '0 30px 70px -15px rgba(0,0,0,0.95), inset 0 0 40px rgba(245, 158, 11, 0.25)',
+              background: theme.palette.cardBg,
+              boxShadow: `0 30px 70px -15px rgba(0,0,0,0.95), inset 0 0 40px ${theme.palette.shadowGlow}`,
             }}
           >
-            {/* Ornate Gold Filigree Pattern */}
             <div
               className="absolute inset-2 rounded-2xl opacity-25 border border-dashed border-amber-300"
               style={{
@@ -294,12 +225,10 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
               boxShadow: '0 25px 50px rgba(0,0,0,0.9), inset 0 0 0 1px #D97706',
             }}
           >
-            {/* Vedic Invocation Header */}
             <span className="text-[11px] font-serif font-bold tracking-widest text-[#B45309] block truncate max-w-full">
-              {hindiTitle || '|| श्री गणेशाय नमः ||'}
+              {hindiTitle || theme.typography.vedicHeader}
             </span>
 
-            {/* Celebrant / Couple Title */}
             <div className="space-y-1 my-auto">
               <span className="text-[10px] font-mono font-extrabold uppercase tracking-widest text-[#9E6F6D] block">
                 ✦ ROYAL INVITATION ✦
@@ -362,7 +291,7 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
               }}
             >
               <span className="font-serif font-extrabold text-amber-100 text-xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]">
-                {getSealEmblem()}
+                {theme.sealEmblem}
               </span>
               <div className="absolute inset-0 rounded-full border border-dashed border-amber-200/60 animate-spin duration-4000" />
             </div>
@@ -380,7 +309,6 @@ export const EnvelopeExperience: React.FC<EnvelopeExperienceProps> = ({
               background: 'linear-gradient(135deg, #7E1E38 0%, #591628 50%, #3D0D19 100%)',
             }}
           >
-            {/* Shimmer Light Sweep */}
             <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/25 to-transparent" />
             <Heart className="w-4 h-4 text-amber-300 fill-amber-300 animate-pulse" />
             <span className="drop-shadow-md text-amber-200 font-extrabold tracking-widest">

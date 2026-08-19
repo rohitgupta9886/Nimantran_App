@@ -137,11 +137,11 @@ async def test_broadcast_100_guests():
         guest_ids = []
         for i in range(100):
             g = Guest(
-                id=f"gst_100_{i}_{secrets.token_hex(2)}",
+                id=f"gst_100_{i}_{secrets.token_hex(3)}",
                 event_id=event_id,
                 name=f"Large Scale Guest {i}",
-                phone=f"+9198765{i:05d}",
-                invitation_token=f"nim_100_{i}",
+                phone=f"+91987{secrets.token_hex(2)}{i:03d}",
+                invitation_token=f"nim_100_{i}_{secrets.token_hex(4)}",
             )
             db.add(g)
             guest_ids.append(g.id)
