@@ -14,7 +14,6 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage').then(m => ({ defa
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then(m => ({ default: m.DashboardPage })));
 const EventWizardPage = lazy(() => import('./pages/EventWizardPage').then(m => ({ default: m.EventWizardPage })));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage').then(m => ({ default: m.EventDetailPage })));
-const PublicEventPage = lazy(() => import('./pages/PublicEventPage').then(m => ({ default: m.PublicEventPage })));
 const ScannerPage = lazy(() => import('./pages/ScannerPage').then(m => ({ default: m.ScannerPage })));
 const WelcomeScreenPage = lazy(() => import('./pages/WelcomeScreenPage').then(m => ({ default: m.WelcomeScreenPage })));
 const BillingPage = lazy(() => import('./pages/BillingPage').then(m => ({ default: m.BillingPage })));
@@ -41,9 +40,8 @@ const LayoutShell: React.FC = () => {
     }
   }, [location]);
 
-  // Check if current route is a standalone full-screen page (Public Event, Scanner, Welcome TV, Auth)
+  // Check if current route is a standalone full-screen page (Scanner, Welcome TV, Auth)
   const isStandalonePage =
-    location.pathname.startsWith('/i/') ||
     location.pathname.startsWith('/scan/') ||
     location.pathname.startsWith('/welcome/') ||
     location.pathname === '/' ||
@@ -61,16 +59,13 @@ const LayoutShell: React.FC = () => {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/auth" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
-              <Route path="/i/t/:token" element={<PublicEventPage />} />
-              <Route path="/i/:slug" element={<PublicEventPage />} />
-              <Route path="/i/:slug/pass" element={<PublicEventPage />} />
               <Route path="/scan/:eventId" element={<ScannerPage />} />
               <Route path="/welcome/:eventId" element={<WelcomeScreenPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
         </main>
-        {!location.pathname.startsWith('/i/') && !location.pathname.startsWith('/scan/') && !location.pathname.startsWith('/welcome/') && (
+        {!location.pathname.startsWith('/scan/') && !location.pathname.startsWith('/welcome/') && (
           <Footer />
         )}
       </div>

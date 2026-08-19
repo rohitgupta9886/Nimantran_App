@@ -27,7 +27,7 @@ export const OpeningScene: React.FC<OpeningSceneProps> = ({
   // 'DOCKED_READY' (4.2s+): Envelope centered in foreground, glowing wax seal, awaiting tap
   // 'CARD_EMERGING' (On Tap): Flap opens, glowing stationery card rises vertically upwards
   const [motionPhase, setMotionPhase] = useState<'DOVE_FLIGHT' | 'ENVELOPE_DESCENT' | 'DOCKED_READY' | 'CARD_EMERGING'>('DOVE_FLIGHT');
-  
+
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const envelopeRef = useRef<HTMLDivElement | null>(null);
 
@@ -71,7 +71,7 @@ export const OpeningScene: React.FC<OpeningSceneProps> = ({
         colors: ['#FFD700', '#FFA500', '#F43F5E', '#FDA4AF', '#FFFFFF', '#D4AF37'],
         ticks: 380,
       });
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const handleOpenEnvelope = () => {
@@ -96,7 +96,7 @@ export const OpeningScene: React.FC<OpeningSceneProps> = ({
 
   return (
     <div className="fixed inset-0 z-30 w-full h-full overflow-hidden select-none flex flex-col justify-between items-center font-sans">
-      
+
       {/* 🌟 1. IMMERSIVE FULL-PAGE CONTINUOUS SKY & CLOUD BACKGROUND 🌟 */}
       <div className="absolute inset-0 -z-20 overflow-hidden">
         <img
@@ -130,10 +130,10 @@ export const OpeningScene: React.FC<OpeningSceneProps> = ({
             {motionPhase === 'DOVE_FLIGHT'
               ? '🕊️ A Sacred Messenger From The Heavens...'
               : motionPhase === 'ENVELOPE_DESCENT'
-              ? '✨ Delivering Your Auspicious Invitation...'
-              : guestName
-              ? `Exclusive Invitation for ${guestName}`
-              : '✦ An Auspicious Celebration Awaits You ✦'}
+                ? '✨ Delivering Your Auspicious Invitation...'
+                : guestName
+                  ? `Exclusive Invitation for ${guestName}`
+                  : '✦ An Auspicious Celebration Awaits You ✦'}
           </span>
           <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
         </div>
@@ -147,11 +147,10 @@ export const OpeningScene: React.FC<OpeningSceneProps> = ({
 
       {/* 🌟 3. CONTINUOUS WHITE DOVE IN FLIGHT (PHASE 0 TO 1) 🌟 */}
       <div
-        className={`absolute pointer-events-none z-20 transition-all duration-1500 ease-out ${
-          motionPhase === 'DOVE_FLIGHT'
+        className={`absolute pointer-events-none z-20 transition-all duration-1500 ease-out ${motionPhase === 'DOVE_FLIGHT'
             ? 'top-[16%] left-1/2 -translate-x-1/2 scale-100 opacity-100'
             : 'top-[-25%] left-[80%] scale-75 opacity-0'
-        }`}
+          }`}
         style={{
           filter: 'drop-shadow(0 20px 35px rgba(0,0,0,0.45))',
         }}
@@ -174,8 +173,8 @@ export const OpeningScene: React.FC<OpeningSceneProps> = ({
             motionPhase === 'DOVE_FLIGHT'
               ? 'translateY(-200px) scale(0.15) opacity(0)'
               : motionPhase === 'ENVELOPE_DESCENT'
-              ? 'translateY(-70px) scale(0.65) rotateZ(-14deg) rotateX(25deg)'
-              : 'translateY(0px) scale(1.0) rotateZ(0deg) rotateX(0deg)',
+                ? 'translateY(-70px) scale(0.65) rotateZ(-14deg) rotateX(25deg)'
+                : 'translateY(0px) scale(1.0) rotateZ(0deg) rotateX(0deg)',
           opacity: motionPhase === 'DOVE_FLIGHT' ? 0 : 1,
         }}
       >
@@ -185,13 +184,11 @@ export const OpeningScene: React.FC<OpeningSceneProps> = ({
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onClick={handleOpenEnvelope}
-          className={`relative w-[320px] sm:w-[400px] h-[220px] sm:h-[265px] transition-transform duration-300 ease-out ${
-            motionPhase === 'DOCKED_READY' ? 'cursor-pointer group hover:scale-105 active:scale-95' : ''
-          }`}
+          className={`relative w-[320px] sm:w-[400px] h-[220px] sm:h-[265px] transition-transform duration-300 ease-out ${motionPhase === 'DOCKED_READY' ? 'cursor-pointer group hover:scale-105 active:scale-95' : ''
+            }`}
           style={{
-            transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${
-              motionPhase === 'CARD_EMERGING' ? 1.08 : 1.0
-            }, ${motionPhase === 'CARD_EMERGING' ? 1.08 : 1.0}, 1)`,
+            transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale3d(${motionPhase === 'CARD_EMERGING' ? 1.08 : 1.0
+              }, ${motionPhase === 'CARD_EMERGING' ? 1.08 : 1.0}, 1)`,
             transformStyle: 'preserve-3d',
           }}
         >

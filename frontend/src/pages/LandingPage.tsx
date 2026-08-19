@@ -289,13 +289,13 @@ export const LandingPage: React.FC = () => {
               <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition-transform" />
             </button>
 
-            <Link
-              to="/i/rohit-priya-wedding-2026"
+            <a
+              href="#designs"
               className="w-full sm:w-auto px-7 py-4 rounded-full bg-white hover:bg-[#F6ECE7] border border-[#DAC0C2] text-[#1F1B18] font-bold text-sm transition-all flex items-center justify-center gap-2 min-h-[52px] shadow-sm active:scale-95"
             >
               <Eye className="w-4 h-4 text-[#6B1D2F]" />
-              <span>Experience Live Demo</span>
-            </Link>
+              <span>Explore Themes</span>
+            </a>
           </div>
 
           {/* Social Proof & Trust Bar */}

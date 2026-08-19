@@ -85,7 +85,7 @@ export const GuestExperience: React.FC<GuestExperienceProps> = ({
       audioRef.current
         .play()
         .then(() => setIsPlayingMusic(true))
-        .catch(() => {});
+        .catch(() => { });
     }
   };
 
@@ -100,7 +100,7 @@ export const GuestExperience: React.FC<GuestExperienceProps> = ({
       audioRef.current.pause();
       setIsPlayingMusic(false);
     } else {
-      audioRef.current.play().then(() => setIsPlayingMusic(true)).catch(() => {});
+      audioRef.current.play().then(() => setIsPlayingMusic(true)).catch(() => { });
     }
   };
 
