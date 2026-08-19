@@ -259,64 +259,64 @@ export const LandingPage: React.FC = () => {
 
       {/* 🌟 2. HERO SECTION 🌟 */}
       <section className="relative px-4 sm:px-8 pt-12 sm:pt-20 pb-16 max-w-7xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto space-y-6">
+        <div className="text-center max-w-4xl mx-auto space-y-6">
           
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gold-50 border border-gold-200 text-gold-900 text-xs font-semibold shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 text-gold-600 animate-pulse" />
-            <span>AI-Powered Digital Invitations for Every Celebration</span>
+          {/* Eyebrow Label */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FECE57]/20 border border-[#775A00]/30 text-[#4E051A] text-xs font-bold shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-[#775A00] animate-pulse" />
+            <span className="font-mono uppercase tracking-wider text-[11px]">AI-Powered Celebration Platform & Luxury Digital Cards</span>
           </div>
 
           {/* Main Headline */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-charcoal-900 font-serif tracking-tight leading-[1.15]">
-            Create beautiful invitations. <br />
-            <span className="wine-text-gradient">Celebrate every moment.</span>
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold text-[#1F1B18] font-serif tracking-tight leading-[1.1]">
+            One Invitation. One Link. <br />
+            <span className="text-[#4E051A]">Entire Celebration.</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="text-base sm:text-lg text-charcoal-600 max-w-2xl mx-auto leading-relaxed">
-            Craft bespoke digital invitations in seconds with AI, send effortlessly via WhatsApp, and manage guest RSVPs with joy.
+          <p className="text-base sm:text-lg text-[#544244] max-w-2xl mx-auto leading-relaxed font-sans">
+            Craft bespoke luxury digital invitations in seconds with conversational AI, dispatch instantly via WhatsApp & SMS, and manage guest check-ins with 4K venue welcome screens.
           </p>
 
           {/* Action CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
             <button
               onClick={handleCreateCelebration}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-wine hover:bg-wine-700 active:bg-wine-900 text-white font-bold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 min-h-[50px] group"
+              className="w-full sm:w-auto px-9 py-4 rounded-full bg-[#4E051A] hover:bg-[#6B1D2F] active:bg-[#400013] text-white font-bold text-sm shadow-xl hover:shadow-2xl transition-all flex items-center justify-center gap-2.5 min-h-[52px] group active:scale-95"
             >
-              <PlusCircle className="w-4 h-4 text-gold group-hover:scale-110 transition-transform" />
-              <span>Create Your Invitation</span>
+              <PlusCircle className="w-4 h-4 text-[#FECE57] group-hover:scale-110 transition-transform" />
+              <span>Create Your Royal Event</span>
               <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition-transform" />
             </button>
 
-            <a
-              href="#designs"
-              className="w-full sm:w-auto px-6 py-4 rounded-xl bg-white hover:bg-surface-subtle border border-charcoal-200 text-charcoal-800 font-semibold text-sm transition-all flex items-center justify-center gap-2 min-h-[50px]"
+            <Link
+              to="/i/rohit-priya-wedding-2026"
+              className="w-full sm:w-auto px-7 py-4 rounded-full bg-white hover:bg-[#F6ECE7] border border-[#DAC0C2] text-[#1F1B18] font-bold text-sm transition-all flex items-center justify-center gap-2 min-h-[52px] shadow-sm active:scale-95"
             >
-              <Eye className="w-4 h-4 text-charcoal-500" />
-              <span>Explore Designs</span>
-            </a>
+              <Eye className="w-4 h-4 text-[#6B1D2F]" />
+              <span>Experience Live Demo</span>
+            </Link>
           </div>
 
-          {/* Trust Highlights */}
-          <div className="flex items-center justify-center gap-6 pt-4 text-xs text-charcoal-500 font-medium flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Free to Start</span>
+          {/* Social Proof & Trust Bar */}
+          <div className="flex items-center justify-center gap-6 sm:gap-10 pt-6 text-xs text-[#544244] font-medium flex-wrap">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+              <span className="font-bold">500,000+ Invitations Dispatched</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>1-Click WhatsApp Send</span>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+              <span className="font-bold">99.8% Delivery Rate</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Real-time RSVPs</span>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+              <span className="font-bold">4.9/5 Star Host Rating</span>
             </div>
           </div>
         </div>
 
         {/* 🌟 3. INTERACTIVE LIVE INVITATION CARD SHOWCASE 🌟 */}
-        <div id="designs" className="mt-14 sm:mt-18 pt-6">
+        <div id="designs" className="mt-14 sm:mt-20 pt-6">
           <div className="text-center mb-8">
             <span className="text-xs font-bold uppercase tracking-wider text-wine">
               Curated Celebration Themes

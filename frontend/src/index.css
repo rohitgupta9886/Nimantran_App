@@ -5,6 +5,20 @@
 @tailwind utilities;
 
 :root {
+  /* Google Stitch Modern Indian Luxury Tokens */
+  --stitch-surface: #fff8f5;
+  --stitch-surface-container: #f6ece7;
+  --stitch-surface-high: #f0e6e1;
+  --stitch-primary: #4e051a;
+  --stitch-primary-container: #6b1d2f;
+  --stitch-secondary: #775a00;
+  --stitch-secondary-container: #fece57;
+  --stitch-tertiary: #4a0e0e;
+  --stitch-on-surface: #1f1b18;
+  --stitch-outline: #877274;
+  --stitch-midnight-canvas: #0A0205;
+  --stitch-midnight-surface: #14050C;
+
   /* Nimantran Warm Luxury Brand Tokens */
   --color-canvas: #FAF7F2;
   --color-surface: #FFFFFF;

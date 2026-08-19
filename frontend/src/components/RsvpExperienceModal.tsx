@@ -120,47 +120,44 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-[#FFFDFC] border border-[#E9D3D0] rounded-3xl max-w-xl w-full p-6 text-[#302829] shadow-2xl relative my-auto space-y-6">
+    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-sans">
+      <div className="bg-[#FFF8F5] border border-[#DAC0C2] rounded-3xl max-w-xl w-full p-6 sm:p-8 text-[#1F1B18] shadow-2xl relative my-auto space-y-6">
         
         {/* STEP 1: CHOICE SCREEN (Hero & 3 Big Choice Cards) */}
         {step === 'CHOICE' && (
           <div className="space-y-6 text-center">
             {/* Header Tagline */}
             <div className="space-y-2">
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[#9E6F6D] font-extrabold block">
-                YOU'RE INVITED
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6B1D2F] font-extrabold block">
+                PRIVATE INVITATION
               </span>
-              <h2 className="font-serif text-2xl sm:text-3xl font-extrabold gold-gradient-text">
-                A special celebration awaits you
+              <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#4E051A]">
+                Will you grace us with your presence?
               </h2>
-              <p className="text-xs text-[#51484A] max-w-md mx-auto leading-relaxed">
-                Your presence will make our celebration even more special. Please confirm your attendance.
+              <p className="text-xs text-[#544244] max-w-md mx-auto leading-relaxed">
+                Your presence and blessings will make our celebration complete. Please confirm your attendance.
               </p>
             </div>
 
             {/* Date & Venue Pills */}
             <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-mono">
-              <span className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#E9D3D0] text-[#302829] font-bold flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[#9E6F6D]" /> {eventDate}
+              <span className="px-3 py-1.5 rounded-full bg-[#F6ECE7] border border-[#DAC0C2] text-[#1F1B18] font-bold flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-[#6B1D2F]" /> {eventDate}
               </span>
-              <span className="px-3 py-1.5 rounded-full bg-[#FAF7F3] border border-[#E9D3D0] text-[#302829] font-bold flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-[#9E6F6D]" /> {eventVenue}
+              <span className="px-3 py-1.5 rounded-full bg-[#F6ECE7] border border-[#DAC0C2] text-[#1F1B18] font-bold flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#6B1D2F]" /> {eventVenue}
               </span>
             </div>
 
             {/* 3D Invitation Card Illustration */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#FAF7F3] to-[#F2E5E2] border border-[#D8B5B0] max-w-sm mx-auto shadow-inner relative overflow-hidden group">
-              <div className="absolute top-2 right-2 text-rose-300 opacity-20 group-hover:scale-110 transition-transform">
-                🌸
-              </div>
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#FFF8F5] to-[#F6ECE7] border border-[#DAC0C2] max-w-sm mx-auto shadow-inner relative overflow-hidden group">
               <div className="text-center space-y-1">
-                <span className="font-serif text-lg font-bold gold-gradient-text block">{eventTitle}</span>
-                <span className="text-[10px] font-mono text-[#8C7E80] uppercase block tracking-wider">Celebration Invitation</span>
+                <span className="font-serif text-lg font-bold text-[#4E051A] block">{eventTitle}</span>
+                <span className="text-[10px] font-mono text-[#877274] uppercase block tracking-wider">Celebration Invitation</span>
               </div>
             </div>
 
-            <p className="text-xs font-serif italic text-[#8C7E80]">We would love to celebrate with you!</p>
+            <p className="text-xs font-serif italic text-[#877274]">We eagerly await the pleasure of your company.</p>
 
             {/* 3 Primary RSVP CTA Choice Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -168,39 +165,39 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleSelectChoice('CONFIRMED')}
-                className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-500/80 hover:border-emerald-600 text-emerald-950 flex flex-col items-center justify-center text-center space-y-1 shadow-sm hover:shadow-md hover:scale-102 transition-all cursor-pointer group"
+                className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-600/80 hover:border-emerald-700 text-emerald-950 flex flex-col items-center justify-center text-center space-y-1 shadow-sm hover:shadow-md hover:scale-102 transition-all cursor-pointer group active:scale-95"
               >
                 <div className="w-9 h-9 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-base shadow-sm group-hover:scale-110 transition-transform">
                   <Check className="w-5 h-5" />
                 </div>
-                <span className="font-extrabold text-sm block">I'll Be There</span>
-                <span className="text-[11px] text-emerald-800 font-semibold block">Yes, I'll attend</span>
+                <span className="font-extrabold text-sm block">Attending</span>
+                <span className="text-[11px] text-emerald-800 font-semibold block">Accept with joy</span>
               </button>
 
               {/* Option 2: Maybe */}
               <button
                 type="button"
                 onClick={() => handleSelectChoice('MAYBE')}
-                className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-400 hover:border-amber-500 text-amber-950 flex flex-col items-center justify-center text-center space-y-1 shadow-sm hover:shadow-md hover:scale-102 transition-all cursor-pointer group"
+                className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-400 hover:border-amber-500 text-amber-950 flex flex-col items-center justify-center text-center space-y-1 shadow-sm hover:shadow-md hover:scale-102 transition-all cursor-pointer group active:scale-95"
               >
                 <div className="w-9 h-9 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-base shadow-sm group-hover:scale-110 transition-transform">
                   <HelpCircle className="w-5 h-5" />
                 </div>
-                <span className="font-extrabold text-sm block">Maybe</span>
-                <span className="text-[11px] text-amber-800 font-semibold block">Not sure yet</span>
+                <span className="font-extrabold text-sm block">Thinking</span>
+                <span className="text-[11px] text-amber-800 font-semibold block">Tentative</span>
               </button>
 
               {/* Option 3: No */}
               <button
                 type="button"
                 onClick={() => handleSelectChoice('NOT_ATTENDING')}
-                className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 hover:border-rose-400 text-rose-950 flex flex-col items-center justify-center text-center space-y-1 shadow-sm hover:shadow-md hover:scale-102 transition-all cursor-pointer group"
+                className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-300 hover:border-rose-400 text-rose-950 flex flex-col items-center justify-center text-center space-y-1 shadow-sm hover:shadow-md hover:scale-102 transition-all cursor-pointer group active:scale-95"
               >
-                <div className="w-9 h-9 rounded-full bg-rose-600 text-white flex items-center justify-center font-bold text-base shadow-sm group-hover:scale-110 transition-transform">
+                <div className="w-9 h-9 rounded-full bg-rose-700 text-white flex items-center justify-center font-bold text-base shadow-sm group-hover:scale-110 transition-transform">
                   <XCircle className="w-5 h-5" />
                 </div>
-                <span className="font-extrabold text-sm block">I Can't Make It</span>
-                <span className="text-[11px] text-rose-800 font-semibold block">Unfortunately</span>
+                <span className="font-extrabold text-sm block">Declining</span>
+                <span className="text-[11px] text-rose-800 font-semibold block">Sending blessings</span>
               </button>
             </div>
 
@@ -208,7 +205,7 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="text-xs font-bold text-[#8C7E80] hover:text-[#302829] hover:underline"
+                className="text-xs font-bold text-[#877274] hover:text-[#1F1B18] hover:underline"
               >
                 Cancel / Close
               </button>
@@ -220,28 +217,28 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
         {step === 'FORM' && (
           <form onSubmit={handleFormSubmit} className="space-y-5">
             {/* Header & Back bar */}
-            <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-3">
+            <div className="flex items-center justify-between border-b border-[#DAC0C2] pb-3">
               <button
                 type="button"
                 onClick={() => setStep('CHOICE')}
-                className="text-xs font-bold text-[#9E6F6D] hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-[#6B1D2F] hover:underline flex items-center gap-1"
               >
                 ← Back
               </button>
-              <span className="text-[10px] font-mono text-[#8C7E80] flex items-center gap-1">
+              <span className="text-[10px] font-mono text-[#877274] flex items-center gap-1">
                 <Lock className="w-3 h-3 text-emerald-600" /> Secure & Private
               </span>
             </div>
 
             <div>
-              <h3 className="font-serif text-xl font-extrabold text-[#302829]">RSVP Details</h3>
-              <p className="text-xs text-[#8C7E80]">Tell us a little more so we can make your experience even better.</p>
+              <h3 className="font-serif text-xl font-extrabold text-[#4E051A]">RSVP Details</h3>
+              <p className="text-xs text-[#544244]">Tell us a little more so we can make your celebration experience unforgettable.</p>
             </div>
 
             {/* Personalized Guest Pill */}
-            <div className="p-3 rounded-2xl bg-[#FAF7F3] border border-[#E9D3D0] flex items-center justify-between gap-3">
+            <div className="p-3 rounded-2xl bg-[#F6ECE7] border border-[#DAC0C2] flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#9E6F6D] text-white font-extrabold text-xs flex items-center justify-center shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-[#6B1D2F] text-white font-extrabold text-xs flex items-center justify-center shadow-sm">
                   {getInitials(guestNameInput)}
                 </div>
                 <div>
@@ -250,9 +247,9 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
                     value={guestNameInput}
                     onChange={(e) => setGuestNameInput(e.target.value)}
                     placeholder="Your Name"
-                    className="font-bold text-sm text-[#302829] bg-transparent border-b border-[#D8B5B0] focus:border-[#9E6F6D] outline-none"
+                    className="font-bold text-sm text-[#1F1B18] bg-transparent border-b border-[#877274] focus:border-[#4E051A] outline-none"
                   />
-                  <span className="text-[10px] text-[#8C7E80] block font-mono">Invited Guest</span>
+                  <span className="text-[10px] text-[#877274] block font-mono">Invited Guest</span>
                 </div>
               </div>
 
@@ -261,13 +258,13 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
                 value={phoneInput}
                 onChange={(e) => setPhoneInput(e.target.value)}
                 placeholder="WhatsApp Phone (Optional)"
-                className="px-3 py-1.5 rounded-xl bg-[#FFFDFC] border border-[#E9D3D0] text-xs text-[#302829] w-36 outline-none"
+                className="px-3 py-1.5 rounded-xl bg-white border border-[#DAC0C2] text-xs text-[#1F1B18] w-36 outline-none"
               />
             </div>
 
             {/* Number of Guests Cards */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-[#302829] block uppercase tracking-wider font-mono">
+              <label className="text-xs font-bold text-[#1F1B18] block uppercase tracking-wider font-mono">
                 Number of Guests
               </label>
               <div className="grid grid-cols-4 gap-2 text-center">
@@ -283,8 +280,8 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
                     onClick={() => setGuestCount(opt.num)}
                     className={`p-2.5 rounded-xl border font-bold text-xs transition-all ${
                       guestCount === opt.num
-                        ? 'bg-[#9E6F6D] text-white border-[#875B59] shadow-md scale-102'
-                        : 'bg-[#FFFDFC] border-[#E9D3D0] text-[#302829] hover:bg-[#FAF7F3]'
+                        ? 'bg-[#6B1D2F] text-white border-[#4E051A] shadow-md scale-102'
+                        : 'bg-white border-[#DAC0C2] text-[#1F1B18] hover:bg-[#F6ECE7]'
                     }`}
                   >
                     <span className="font-extrabold text-sm block">{opt.label}</span>
@@ -296,15 +293,15 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
 
             {/* Meal Preference Cards */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-[#302829] block uppercase tracking-wider font-mono">
-                Meal Preference
+              <label className="text-xs font-bold text-[#1F1B18] block uppercase tracking-wider font-mono">
+                Dietary Preference
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                 {[
-                  { id: 'Veg (only)', label: '🌱 Veg', sub: '(pure veg)' },
-                  { id: 'Jain (only)', label: '🙏 Jain', sub: '(no onion/garlic)' },
-                  { id: 'Non-Veg (only)', label: '🍗 Non-Veg', sub: '(halal/non-veg)' },
-                  { id: 'Any', label: '🍲 Any', sub: "(no preference)" },
+                  { id: 'Veg (only)', label: '🌱 Pure Veg', sub: 'Vegetarian' },
+                  { id: 'Jain (only)', label: '🙏 Jain', sub: 'No onion/garlic' },
+                  { id: 'Non-Veg (only)', label: '🍗 Non-Veg', sub: 'Halal/Non-Veg' },
+                  { id: 'Any', label: '🍲 Any', sub: "No preference" },
                 ].map((meal) => (
                   <button
                     key={meal.id}
@@ -312,8 +309,8 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
                     onClick={() => setMealPreference(meal.id as any)}
                     className={`p-2.5 rounded-xl border font-bold text-xs transition-all ${
                       mealPreference === meal.id
-                        ? 'bg-[#9E6F6D] text-white border-[#875B59] shadow-md scale-102'
-                        : 'bg-[#FFFDFC] border-[#E9D3D0] text-[#302829] hover:bg-[#FAF7F3]'
+                        ? 'bg-[#6B1D2F] text-white border-[#4E051A] shadow-md scale-102'
+                        : 'bg-white border-[#DAC0C2] text-[#1F1B18] hover:bg-[#F6ECE7]'
                     }`}
                   >
                     <span className="font-bold text-xs block">{meal.label}</span>
@@ -325,15 +322,15 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
 
             {/* Any Special Message */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[#302829] block font-mono">
-                Any special message? (Optional)
+              <label className="text-xs font-bold text-[#1F1B18] block font-mono">
+                Note for the Hosts (Optional)
               </label>
               <textarea
                 value={specialNotes}
                 onChange={(e) => setSpecialNotes(e.target.value)}
-                placeholder="Allergies, accessibility needs, special requests..."
+                placeholder="Leave a wish or let us know any dietary / accessibility requirements..."
                 rows={2}
-                className="w-full p-3 rounded-2xl bg-[#FAF7F3] border border-[#E9D3D0] text-xs text-[#302829] placeholder:text-[#8C7E80] outline-none focus:border-[#9E6F6D]"
+                className="w-full p-3 rounded-2xl bg-white border border-[#DAC0C2] text-xs text-[#1F1B18] placeholder:text-[#877274] outline-none focus:border-[#4E051A]"
               />
             </div>
 
@@ -341,9 +338,9 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3.5 rounded-2xl bg-[#9E6F6D] hover:bg-[#875B59] text-white font-extrabold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 rounded-full bg-[#6B1D2F] hover:bg-[#83243A] text-white font-extrabold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
             >
-              <span>{submitting ? 'Confirming RSVP...' : 'Confirm My RSVP'}</span>
+              <span>{submitting ? 'Confirming RSVP...' : 'Confirm RSVP'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -353,7 +350,7 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
         {step === 'THANK_YOU' && (
           <div className="space-y-5 text-center py-2">
             {/* Circle Checkmark Icon */}
-            <div className="w-14 h-14 rounded-full bg-emerald-50 border-2 border-emerald-500/80 text-emerald-700 flex items-center justify-center mx-auto shadow-md animate-bounce">
+            <div className="w-14 h-14 rounded-full bg-emerald-50 border-2 border-emerald-600/80 text-emerald-700 flex items-center justify-center mx-auto shadow-md animate-bounce">
               <Check className="w-7 h-7 stroke-[3]" />
             </div>
 
@@ -361,36 +358,36 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
               <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-800 font-extrabold block">
                 {submittedData?.status_label || (submittedData?.status === 'NO' ? 'RESPONSE RECORDED' : 'ATTENDANCE CONFIRMED')}
               </span>
-              <h2 className="font-serif text-2xl sm:text-3xl font-extrabold gold-gradient-text">Thank You!</h2>
-              <p className="text-xs text-[#51484A]">
+              <h2 className="font-serif text-2xl sm:text-3xl font-extrabold text-[#4E051A]">Thank You!</h2>
+              <p className="text-xs text-[#544244]">
                 {submittedData?.status === 'NO' 
                   ? 'We will miss you at the celebration!' 
-                  : "Your RSVP response has been confirmed. We can't wait to celebrate with you!"}
+                  : "Your RSVP response has been recorded. We can't wait to celebrate with you!"}
               </p>
             </div>
 
             {/* Structured Review Card */}
-            <div className="p-4 rounded-2xl bg-[#FAF7F3] border border-[#E9D3D0] max-w-sm mx-auto space-y-3 text-xs shadow-sm text-left">
-              <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-2">
-                <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold">GUEST IDENTITY</span>
-                <span className="font-bold text-[#302829]">{submittedData?.guest_name || guestNameInput || 'Valued Guest'}</span>
+            <div className="p-4 rounded-2xl bg-[#F6ECE7] border border-[#DAC0C2] max-w-sm mx-auto space-y-3 text-xs shadow-sm text-left">
+              <div className="flex items-center justify-between border-b border-[#DAC0C2] pb-2">
+                <span className="text-[10px] font-mono text-[#877274] uppercase tracking-wider font-bold">GUEST IDENTITY</span>
+                <span className="font-bold text-[#1F1B18]">{submittedData?.guest_name || guestNameInput || 'Valued Guest'}</span>
               </div>
 
-              <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-2">
-                <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold">GUESTS ATTENDING</span>
+              <div className="flex items-center justify-between border-b border-[#DAC0C2] pb-2">
+                <span className="text-[10px] font-mono text-[#877274] uppercase tracking-wider font-bold">GUESTS ATTENDING</span>
                 <span className="font-extrabold text-emerald-800">
                   {submittedData?.status === 'NO' ? '0 (Not Attending)' : `${submittedData?.adults_attending || guestCount} guest(s)`}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between border-b border-[#E9D3D0] pb-2">
-                <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold">MEAL PREFERENCE</span>
-                <span className="font-bold text-[#302829]">{submittedData?.meal_preference || mealPreference}</span>
+              <div className="flex items-center justify-between border-b border-[#DAC0C2] pb-2">
+                <span className="text-[10px] font-mono text-[#877274] uppercase tracking-wider font-bold">DIETARY PREFERENCE</span>
+                <span className="font-bold text-[#1F1B18]">{submittedData?.meal_preference || mealPreference}</span>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono text-[#8C7E80] uppercase tracking-wider font-bold">CELEBRATION</span>
-                <span className="font-serif font-bold text-[#302829] truncate max-w-[160px]">{eventTitle}</span>
+                <span className="text-[10px] font-mono text-[#877274] uppercase tracking-wider font-bold">CELEBRATION</span>
+                <span className="font-serif font-bold text-[#1F1B18] truncate max-w-[160px]">{eventTitle}</span>
               </div>
             </div>
 
@@ -411,7 +408,7 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
               <button
                 type="button"
                 onClick={() => setStep('CHOICE')}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-[#FAF7F3] hover:bg-[#F2E5E2] text-[#9E6F6D] border border-[#D8B5B0] font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+                className="flex-1 py-2.5 px-3 rounded-xl bg-white hover:bg-[#F6ECE7] text-[#6B1D2F] border border-[#DAC0C2] font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all"
               >
                 <Edit2 className="w-3.5 h-3.5" />
                 <span>Change RSVP</span>
@@ -422,14 +419,14 @@ export const RsvpExperienceModal: React.FC<RsvpExperienceModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full max-w-sm py-3 rounded-2xl bg-[#9E6F6D] hover:bg-[#875B59] text-white font-extrabold text-xs shadow-md transition-all active:scale-95"
+                className="w-full max-w-sm py-3 rounded-full bg-[#6B1D2F] hover:bg-[#83243A] text-white font-extrabold text-xs shadow-md transition-all active:scale-95"
               >
                 Back to Celebration
               </button>
             </div>
 
-            <p className="text-[10px] font-serif italic text-[#8C7E80] block pt-1">
-              Together, we make celebrations beautiful ♡
+            <p className="text-[10px] font-serif italic text-[#877274] block pt-1">
+              Together, we make celebrations memorable ♡
             </p>
           </div>
         )}
